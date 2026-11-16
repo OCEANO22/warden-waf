@@ -3,36 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WardenWAF — Security &amp; Proxy Dashboard</title>
+    <title>WardenWAF — Security &amp; Reverse Proxy Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Latar belakang gelap selaras halaman login dengan pola kisi & titik node jaringan */
+        .bg-network-grid {
+            background-color: #020617;
+            background-image:
+                radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.11) 0%, transparent 52%),
+                radial-gradient(rgba(52, 211, 153, 0.16) 1px, transparent 1px),
+                linear-gradient(to right, rgba(30, 41, 59, 0.35) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(30, 41, 59, 0.35) 1px, transparent 1px);
+            background-size: 100% 100%, 28px 28px, 28px 28px, 28px 28px;
+        }
+
+        @keyframes flowPacket {
+            to { stroke-dashoffset: -24; }
+        }
+        .network-flow-line {
+            stroke-dasharray: 6 6;
+            animation: flowPacket 1.4s linear infinite;
+        }
     </style>
 </head>
-<body data-username="{{ username }}" data-role="{{ role }}" class="bg-white text-slate-900 min-h-screen flex antialiased">
+<body data-username="{{ username }}" data-role="{{ role }}" class="bg-network-grid text-slate-200 min-h-screen flex antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
 
     <!-- MOBILE SIDEBAR BACKDROP -->
-    <div id="sidebarBackdrop" onclick="toggleMobileSidebar(false)" class="hidden fixed inset-0 z-30 bg-slate-900/30 backdrop-blur-sm lg:hidden"></div>
+    <div id="sidebarBackdrop" onclick="toggleMobileSidebar(false)" class="hidden fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm lg:hidden"></div>
 
-    <!-- LEFT SIDEBAR (CLOUDFLARE STYLE) -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 flex flex-col transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-200 ease-in-out">
-        <!-- BRAND / ACCOUNT SWITCHER -->
-        <div class="h-14 px-4 border-b border-slate-200 flex items-center justify-between">
+    <!-- LEFT SIDEBAR -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900/95 backdrop-blur-md border-r border-slate-800 flex flex-col transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-200 ease-in-out">
+        <!-- BRAND HEADER (SELARAS HALAMAN LOGIN) -->
+        <div class="h-14 px-4 border-b border-slate-800 flex items-center justify-between">
             <button onclick="switchView('overview')" class="flex items-center gap-2.5 text-left group focus:outline-none">
-                <div class="w-7 h-7 rounded-lg bg-orange-500 text-white flex items-center justify-center shadow-sm">
+                <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-sm">
                     <svg class="w-4 h-4" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 1L2 5.5V12.5C2 18.8 6.3 24.6 12 26C17.7 24.6 22 18.8 22 12.5V5.5L12 1Z" fill="currentColor"/>
-                        <path d="M10.5 16L7.5 13L8.9 11.6L10.5 13.2L15.1 8.6L16.5 10L10.5 16Z" fill="#FFFFFF"/>
+                        <path d="M10.5 16L7.5 13L8.9 11.6L10.5 13.2L15.1 8.6L16.5 10L10.5 16Z" fill="#020617"/>
                     </svg>
                 </div>
                 <div class="leading-tight">
-                    <div class="text-sm font-bold text-slate-900 group-hover:text-orange-600 transition">WardenWAF</div>
-                    <div class="text-[11px] text-slate-500 truncate max-w-[140px]">{{ username }} &bull; {{ role }}</div>
+                    <div class="text-sm font-extrabold text-white group-hover:text-emerald-400 transition">WardenWAF</div>
+                    <div class="text-[11px] text-slate-400 truncate max-w-[140px]">{{ username }} &bull; {{ role }}</div>
                 </div>
             </button>
-            <button onclick="toggleMobileSidebar(false)" class="lg:hidden p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+            <button onclick="toggleMobileSidebar(false)" class="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg">
                 &times;
             </button>
         </div>
@@ -40,23 +59,23 @@
         <!-- QUICK SEARCH (CTRL + K) -->
         <div class="p-3">
             <button onclick="focusGlobalSearch()" type="button"
-                class="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 transition">
+                class="w-full flex items-center justify-between px-3 py-2 bg-slate-950/90 hover:bg-slate-950 border border-slate-800 hover:border-emerald-500/40 rounded-xl text-xs text-slate-400 transition">
                 <span class="flex items-center gap-2">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <svg class="w-3.5 h-3.5 text-emerald-400/80" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                     </svg>
                     <span>Quick search...</span>
                 </span>
-                <kbd class="px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-white border border-slate-200 rounded">Ctrl K</kbd>
+                <kbd class="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-900 border border-slate-800 rounded">Ctrl K</kbd>
             </button>
         </div>
 
         <!-- NAVIGATION MENU -->
         <nav class="flex-1 px-3 space-y-1 overflow-y-auto text-[13px]">
             <button onclick="switchView('overview')" id="nav-overview"
-                class="side-nav w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-900 transition">
+                class="side-nav w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 transition">
                 <span class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                     </svg>
                     <span>Beranda WAF</span>
@@ -64,200 +83,274 @@
             </button>
 
             <button onclick="switchView('domains')" id="nav-domains"
-                class="side-nav w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">
+                class="side-nav w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition">
                 <span class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                     </svg>
                     <span>Domains</span>
                 </span>
-                <span id="badgeDomainsCount" class="px-1.5 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-600">0</span>
+                <span id="badgeDomainsCount" class="px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-slate-800 text-slate-300">0</span>
             </button>
 
             <button onclick="switchView('logs')" id="nav-logs"
-                class="side-nav w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">
+                class="side-nav w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition">
                 <span class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                     <span>Observability &amp; Logs</span>
                 </span>
-                <span id="badgeLogsCount" class="px-1.5 py-0.5 text-[11px] font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">0</span>
+                <span id="badgeLogsCount" class="px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">0</span>
             </button>
 
-            <div id="sidebarSecurityGroup" class="hidden pt-4 pb-1 px-3 text-[11px] font-semibold text-slate-400 tracking-wide">
-                Protect &amp; connect
+            <div id="sidebarSecurityGroup" class="hidden pt-4 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Network Defense
             </div>
 
             <button onclick="switchView('banned')" id="nav-banned"
-                class="side-nav hidden w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">
+                class="side-nav hidden w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition">
                 <span class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                     </svg>
                     <span>Blokir IP Permanen</span>
                 </span>
-                <span id="badgeBannedCount" class="px-1.5 py-0.5 text-[11px] font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">0</span>
+                <span id="badgeBannedCount" class="px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">0</span>
             </button>
         </nav>
 
-        <!-- SIDEBAR FOOTER -->
-        <div class="p-3 border-t border-slate-200">
-            <div class="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-                <span class="flex items-center gap-2 text-slate-600 font-medium">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    WAF Engine Aktif
+        <!-- SIDEBAR NETWORK STATUS FOOTER -->
+        <div class="p-3 border-t border-slate-800">
+            <div class="px-3 py-2.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-xs">
+                <span class="flex items-center gap-2 text-emerald-400 font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Terlindungi
                 </span>
-                <span id="lastSyncText" class="text-[11px] text-slate-400 font-mono">--:--</span>
+                <span id="lastSyncText" class="text-[11px] text-slate-500 font-mono">--:--</span>
             </div>
         </div>
     </aside>
 
-    <!-- MAIN AREA -->
-    <div class="flex-1 flex flex-col min-w-0 bg-white">
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex flex-col min-w-0">
 
         <!-- TOP HEADER BAR -->
-        <header class="h-14 px-4 sm:px-6 border-b border-slate-200 bg-white flex items-center justify-between sticky top-0 z-20">
+        <header class="h-14 px-4 sm:px-6 border-b border-slate-800/90 bg-slate-950/80 backdrop-blur-md flex items-center justify-between sticky top-0 z-20">
             <div class="flex items-center gap-3">
-                <button onclick="toggleMobileSidebar(true)" class="lg:hidden p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                <button onclick="toggleMobileSidebar(true)" class="lg:hidden p-2 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 hover:text-white">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
                 <div class="flex items-center gap-2 text-xs text-slate-500">
-                    <span class="font-medium text-slate-700">WardenWAF</span>
+                    <span class="font-medium text-slate-400">WardenWAF</span>
                     <span>/</span>
-                    <span id="breadcrumbCurrent" class="font-semibold text-slate-900">Beranda WAF</span>
+                    <span id="breadcrumbCurrent" class="font-semibold text-white">Beranda WAF</span>
                 </div>
             </div>
 
             <div class="flex items-center gap-2.5">
                 <button onclick="openAddDomainModal()"
-                    class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition shadow-xs">
+                    class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition shadow-sm">
                     <span>+ Tambah Domain</span>
                 </button>
 
                 <button onclick="syncAllData(true)" title="Sinkronkan Data"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-medium text-slate-600 transition">
-                    <svg id="globalSyncIcon" class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-300 transition">
+                    <svg id="globalSyncIcon" class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     <span class="hidden md:inline">Refresh</span>
                 </button>
 
-                <div class="h-4 w-px bg-slate-200 mx-0.5"></div>
+                <div class="h-4 w-px bg-slate-800 mx-0.5"></div>
 
                 <div class="flex items-center gap-2 text-xs">
-                    <span class="hidden sm:inline font-semibold text-slate-700">{{ username }}</span>
-                    <span class="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-bold uppercase text-slate-700">{{ role }}</span>
+                    <span class="hidden sm:inline font-semibold text-slate-200">{{ username }}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold uppercase text-emerald-400">{{ role }}</span>
                 </div>
 
                 <button onclick="logout()"
-                    class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-semibold transition">
+                    class="px-3 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition">
                     Keluar
                 </button>
             </div>
         </header>
 
-        <!-- VIEW 1: BERANDA / OVERVIEW (CLOUDFLARE ACCOUNT HOME STYLE) -->
-        <main id="view-overview" class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-10 space-y-10">
+        <!-- VIEW 1: BERANDA / OVERVIEW -->
+        <main id="view-overview" class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-8">
 
-            <!-- HERO HEADLINE & GLOBAL SEARCH -->
-            <div class="max-w-3xl mx-auto text-center space-y-5">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-                    Protecting today?
-                </h1>
-                <div class="relative text-left">
-                    <div class="flex items-center bg-white border border-slate-300 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/15 rounded-xl px-4 py-3 shadow-xs transition">
-                        <svg class="w-4 h-4 text-slate-400 mr-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-                        </svg>
-                        <input type="text" id="heroSearchInput" oninput="handleHeroSearch()"
-                            placeholder="Cari domain proksi, alamat IP penyerang, atau jenis ancaman..."
-                            class="w-full text-sm text-slate-800 placeholder-slate-400 focus:outline-none">
-                        <div class="hidden sm:flex items-center gap-1 ml-2 shrink-0">
-                            <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded">Ctrl</kbd>
-                            <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded">K</kbd>
-                        </div>
+            <!-- HERO HEADLINE & GLOBAL SEARCH WITH NETWORK ACCENTS -->
+            <div class="relative rounded-2xl border border-slate-800/90 bg-slate-900/60 backdrop-blur-md p-6 sm:p-8 overflow-visible">
+                <!-- Decorative Corner Network Nodes SVG -->
+                <svg class="pointer-events-none absolute top-0 right-0 w-64 h-40 text-emerald-500/15" viewBox="0 0 260 160" fill="none">
+                    <circle cx="220" cy="30" r="3" fill="currentColor"/>
+                    <circle cx="165" cy="58" r="2.5" fill="currentColor"/>
+                    <circle cx="235" cy="95" r="2.5" fill="currentColor"/>
+                    <circle cx="125" cy="24" r="2" fill="currentColor"/>
+                    <line x1="125" y1="24" x2="165" y2="58" stroke="currentColor" stroke-width="1"/>
+                    <line x1="165" y1="58" x2="220" y2="30" stroke="currentColor" stroke-width="1"/>
+                    <line x1="165" y1="58" x2="235" y2="95" stroke="currentColor" stroke-width="1"/>
+                    <line x1="220" y1="30" x2="235" y2="95" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3"/>
+                </svg>
+
+                <div class="max-w-3xl mx-auto text-center space-y-4 relative z-10">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-semibold text-emerald-400">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>Enterprise Edge Network &amp; Reverse Proxy</span>
                     </div>
 
-                    <!-- INSTANT SEARCH DROPDOWN -->
-                    <div id="heroSearchResults" class="hidden absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-72 overflow-y-auto divide-y divide-slate-100"></div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                        Protecting today?
+                    </h1>
+                    <p class="text-xs text-slate-400 max-w-lg mx-auto">
+                        Pantau simpul domain terproteksi, filter serangan SQLi/XSS, dan kelola pemblokiran IP secara waktu nyata.
+                    </p>
+
+                    <div class="relative text-left pt-1">
+                        <div class="flex items-center bg-slate-950/90 border border-slate-700/90 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-xl px-4 py-3 shadow-lg transition">
+                            <svg class="w-4 h-4 text-emerald-400 mr-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                            </svg>
+                            <input type="text" id="heroSearchInput" oninput="handleHeroSearch()"
+                                placeholder="Cari domain proksi, alamat IP penyerang, atau jenis ancaman..."
+                                class="w-full bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none">
+                            <div class="hidden sm:flex items-center gap-1 ml-2 shrink-0">
+                                <kbd class="px-1.5 py-0.5 text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-700 rounded">Ctrl</kbd>
+                                <kbd class="px-1.5 py-0.5 text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-700 rounded">K</kbd>
+                            </div>
+                        </div>
+
+                        <!-- INSTANT SEARCH DROPDOWN -->
+                        <div id="heroSearchResults" class="hidden absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-72 overflow-y-auto divide-y divide-slate-800"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 3-COLUMN CLOUDFLARE HOME SUMMARY GRID -->
-            <div id="overviewColumns" class="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-2">
+            <!-- LIVE NETWORK TOPOLOGY FLOW CARD (AKSEN JARINGAN) -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Topologi Jaringan Reverse Proxy</span>
+                    </div>
+                    <span id="statActiveWafText" class="text-[11px] font-mono text-emerald-400">0 domain aktif</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-5 items-center gap-3">
+                    <!-- NODE 1: VISITOR TRAFFIC -->
+                    <div class="rounded-xl border border-slate-800 bg-slate-950/90 p-3.5 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-[11px] font-mono text-sky-400">PUBLIC EDGE</div>
+                            <div class="text-xs font-bold text-white truncate">Trafik Pengunjung</div>
+                        </div>
+                    </div>
+
+                    <!-- CONNECTOR 1 -->
+                    <div class="hidden md:flex items-center justify-center">
+                        <svg class="w-full h-6" viewBox="0 0 100 24" fill="none">
+                            <line x1="0" y1="12" x2="92" y2="12" stroke="#1e293b" stroke-width="2"/>
+                            <line x1="0" y1="12" x2="92" y2="12" stroke="#10b981" stroke-width="2" class="network-flow-line"/>
+                            <circle cx="94" cy="12" r="3.5" fill="#10b981"/>
+                        </svg>
+                    </div>
+
+                    <!-- NODE 2: WARDENWAF SHIELD -->
+                    <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 flex items-center gap-3 shadow-md shadow-emerald-950/40">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" viewBox="0 0 24 26" fill="none">
+                                <path d="M12 1L2 5.5V12.5C2 18.8 6.3 24.6 12 26C17.7 24.6 22 18.8 22 12.5V5.5L12 1Z" fill="currentColor"/>
+                                <path d="M10.5 16L7.5 13L8.9 11.6L10.5 13.2L15.1 8.6L16.5 10L10.5 16Z" fill="#10b981"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-[11px] font-mono text-emerald-400">WAF ENGINE</div>
+                            <div class="text-xs font-extrabold text-white truncate">SQLi &bull; XSS &bull; Rate Limit</div>
+                        </div>
+                    </div>
+
+                    <!-- CONNECTOR 2 -->
+                    <div class="hidden md:flex items-center justify-center">
+                        <svg class="w-full h-6" viewBox="0 0 100 24" fill="none">
+                            <line x1="0" y1="12" x2="92" y2="12" stroke="#1e293b" stroke-width="2"/>
+                            <line x1="0" y1="12" x2="92" y2="12" stroke="#34d399" stroke-width="2" class="network-flow-line"/>
+                            <circle cx="94" cy="12" r="3.5" fill="#34d399"/>
+                        </svg>
+                    </div>
+
+                    <!-- NODE 3: ORIGIN SERVERS -->
+                    <div class="rounded-xl border border-slate-800 bg-slate-950/90 p-3.5 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-[11px] font-mono text-indigo-400">ORIGIN TARGET</div>
+                            <div class="text-xs font-bold text-white truncate">Server Tujuan Aman</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3-COLUMN SUMMARY GRID -->
+            <div id="overviewColumns" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 <!-- COLUMN 1: DOMAINS -->
-                <section class="space-y-3">
+                <section class="rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5 space-y-3">
                     <div class="flex items-center justify-between">
-                        <button onclick="switchView('domains')" class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800 hover:text-orange-600 transition">
+                        <button onclick="switchView('domains')" class="inline-flex items-center gap-1.5 text-sm font-bold text-white hover:text-emerald-400 transition">
                             <span>Domains</span>
-                            <span id="overviewDomainsCount" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-600">0</span>
-                            <span class="text-slate-400">&rsaquo;</span>
+                            <span id="overviewDomainsCount" class="px-2 py-0.5 text-xs font-mono font-semibold rounded-full bg-slate-800 text-slate-300">0</span>
+                            <span class="text-slate-500">&rsaquo;</span>
                         </button>
-                        <button onclick="switchView('domains')" class="text-xs text-slate-400 hover:text-slate-700">Kelola</button>
+                        <button onclick="switchView('domains')" class="text-xs text-slate-400 hover:text-emerald-400 transition">Kelola</button>
                     </div>
 
-                    <!-- ADD DOMAIN CARD BUTTON -->
                     <button onclick="openAddDomainModal()" type="button"
-                        class="w-full py-5 px-4 rounded-xl bg-slate-50/80 hover:bg-orange-50/50 border border-slate-200/90 hover:border-orange-300 flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 hover:text-orange-700 transition">
-                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        class="w-full py-4 px-4 rounded-xl bg-slate-950/90 hover:bg-emerald-500/10 border border-dashed border-slate-700 hover:border-emerald-500/50 flex items-center justify-center gap-2 text-xs font-semibold text-slate-300 hover:text-emerald-400 transition">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
-                        <span>+ Add a domain</span>
+                        <span>Add a domain</span>
                     </button>
 
-                    <div id="overviewDomainsList" class="divide-y divide-slate-100 border-t border-slate-100"></div>
+                    <div id="overviewDomainsList" class="divide-y divide-slate-800/80 border-t border-slate-800/80"></div>
                 </section>
 
-                <!-- COLUMN 2: BANNED IPS / ACTIVE SECURITY -->
-                <section id="overviewBannedCol" class="space-y-3">
+                <!-- COLUMN 2: BLOCKED IPS -->
+                <section id="overviewBannedCol" class="rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5 space-y-3">
                     <div class="flex items-center justify-between">
-                        <button onclick="switchView('banned')" class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800 hover:text-orange-600 transition">
+                        <button onclick="switchView('banned')" class="inline-flex items-center gap-1.5 text-sm font-bold text-white hover:text-emerald-400 transition">
                             <span>Blocked IPs</span>
-                            <span id="overviewBannedCount" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-600">0</span>
-                            <span class="text-slate-400">&rsaquo;</span>
+                            <span id="overviewBannedCount" class="px-2 py-0.5 text-xs font-mono font-semibold rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">0</span>
+                            <span class="text-slate-500">&rsaquo;</span>
                         </button>
-                        <button onclick="openManualBanModal()" class="text-xs font-medium text-rose-600 hover:text-rose-700">+ Blokir IP</button>
+                        <button onclick="openManualBanModal()" class="text-xs font-semibold text-rose-400 hover:text-rose-300 transition">+ Blokir IP</button>
                     </div>
 
-                    <div id="overviewBannedList" class="divide-y divide-slate-100 border-t border-slate-100"></div>
+                    <div id="overviewBannedList" class="divide-y divide-slate-800/80 border-t border-slate-800/80"></div>
                 </section>
 
                 <!-- COLUMN 3: RECENT ATTACK LOGS -->
-                <section class="space-y-3">
+                <section class="rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5 space-y-3">
                     <div class="flex items-center justify-between">
-                        <button onclick="switchView('logs')" class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800 hover:text-orange-600 transition">
+                        <button onclick="switchView('logs')" class="inline-flex items-center gap-1.5 text-sm font-bold text-white hover:text-emerald-400 transition">
                             <span>Recent Attacks</span>
-                            <span id="overviewLogsCount" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-600">0</span>
-                            <span class="text-slate-400">&rsaquo;</span>
+                            <span id="overviewLogsCount" class="px-2 py-0.5 text-xs font-mono font-semibold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">0</span>
+                            <span class="text-slate-500">&rsaquo;</span>
                         </button>
-                        <button onclick="switchView('logs')" class="text-xs text-slate-400 hover:text-slate-700">Semua log</button>
+                        <button onclick="switchView('logs')" class="text-xs text-slate-400 hover:text-emerald-400 transition">Semua log</button>
                     </div>
 
-                    <div id="overviewLogsList" class="divide-y divide-slate-100 border-t border-slate-100"></div>
+                    <div id="overviewLogsList" class="divide-y divide-slate-800/80 border-t border-slate-800/80"></div>
                 </section>
-            </div>
-
-            <!-- SUBTLE STATUS BANNER -->
-            <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div class="flex items-center gap-3.5">
-                    <div class="w-10 h-10 rounded-lg bg-orange-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                        WAF
-                    </div>
-                    <div>
-                        <div class="text-xs font-bold text-slate-900">Reverse Proxy &amp; JavaScript Challenge Aktif</div>
-                        <div class="text-xs text-slate-500 mt-0.5">
-                            <span id="statActiveWafText">0 domain terlindungi</span> &bull; Penyaringan otomatis SQL Injection, XSS, dan DDoS Rate Limit.
-                        </div>
-                    </div>
-                </div>
-                <button onclick="switchView('domains')"
-                    class="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition shrink-0">
-                    Kelola Konfigurasi &rarr;
-                </button>
             </div>
         </main>
 
@@ -265,15 +358,15 @@
         <section id="view-domains" class="hidden flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 class="text-xl font-bold text-slate-900">Domains</h1>
-                    <p class="text-xs text-slate-500 mt-0.5">Kelola domain yang dilewatkan melalui Reverse Proxy dan aturan keamanan WardenWAF.</p>
+                    <h1 class="text-xl font-extrabold text-white">Domains</h1>
+                    <p class="text-xs text-slate-400 mt-0.5">Kelola simpul domain Reverse Proxy dan aturan penyaringan WardenWAF.</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span id="userNoticeBanner" class="hidden px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+                    <span id="userNoticeBanner" class="hidden px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
                         Menunggu ACC Admin sebelum WAF aktif
                     </span>
                     <button onclick="openAddDomainModal()"
-                        class="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition shadow-xs">
+                        class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition shadow-sm">
                         + Add a domain
                     </button>
                 </div>
@@ -283,38 +376,38 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2 flex-1">
                     <input type="text" id="searchDomainInput" oninput="renderDomainsTable()" placeholder="Cari domain, origin, atau pemilik..."
-                        class="w-full sm:w-72 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-orange-500">
+                        class="w-full sm:w-72 px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
                     <select id="filterDomainStatus" onchange="renderDomainsTable()"
-                        class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-orange-500">
+                        class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:border-emerald-500">
                         <option value="all">Status: Semua</option>
                         <option value="approved">ACC Admin</option>
                         <option value="pending">Pending</option>
                     </select>
                 </div>
                 <button onclick="loadDomains(true)"
-                    class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium transition">
+                    class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-xs font-medium transition">
                     Refresh Tabel
                 </button>
             </div>
 
             <!-- DOMAINS TABLE -->
-            <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+            <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/80 backdrop-blur-md">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr class="bg-slate-50/80 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                                <th class="py-3 px-4">Domain</th>
-                                <th class="py-3 px-4">Origin Target</th>
-                                <th class="py-3 px-4">Rate Limit</th>
-                                <th class="py-3 px-4">Owner</th>
-                                <th class="py-3 px-4">Status</th>
-                                <th class="py-3 px-4">WAF</th>
-                                <th class="py-3 px-4 text-right">Aksi</th>
+                            <tr class="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="py-3.5 px-4">Domain</th>
+                                <th class="py-3.5 px-4">Origin Target</th>
+                                <th class="py-3.5 px-4">Rate Limit</th>
+                                <th class="py-3.5 px-4">Owner</th>
+                                <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4">WAF</th>
+                                <th class="py-3.5 px-4 text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="domainsTableBody" class="divide-y divide-slate-100">
+                        <tbody id="domainsTableBody" class="divide-y divide-slate-800/80">
                             <tr>
-                                <td colspan="7" class="py-8 text-center text-slate-400 text-xs">Memuat data domain...</td>
+                                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Memuat data domain...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -327,41 +420,41 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-xl font-bold text-slate-900">Blokir IP Permanen</h1>
-                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-50 text-rose-700 border border-rose-200">Admin</span>
+                        <h1 class="text-xl font-extrabold text-white">Blokir IP Permanen</h1>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">Admin</span>
                     </div>
-                    <p class="text-xs text-slate-500 mt-0.5">Daftar alamat IP yang dikunci permanen oleh sistem WAF maupun pemblokiran manual admin.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Daftar alamat IP yang dikunci permanen oleh sistem WAF maupun pemblokiran manual admin.</p>
                 </div>
                 <button onclick="openManualBanModal()"
-                    class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition shadow-xs">
+                    class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-sm">
                     + Blokir IP Manual
                 </button>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <input type="text" id="searchBannedInput" oninput="renderBannedTable()" placeholder="Cari alamat IP, domain, atau alasan..."
-                    class="w-full sm:w-80 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-orange-500">
+                    class="w-full sm:w-80 px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
                 <button onclick="loadBannedIps(true)"
-                    class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium transition">
+                    class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-xs font-medium transition">
                     Refresh Daftar
                 </button>
             </div>
 
-            <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+            <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/80 backdrop-blur-md">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr class="bg-slate-50/80 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                                <th class="py-3 px-4">Alamat IP</th>
-                                <th class="py-3 px-4">Domain Target</th>
-                                <th class="py-3 px-4">Alasan Pemblokiran</th>
-                                <th class="py-3 px-4">Waktu Diblokir</th>
-                                <th class="py-3 px-4 text-right">Aksi</th>
+                            <tr class="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="py-3.5 px-4">Alamat IP</th>
+                                <th class="py-3.5 px-4">Domain Target</th>
+                                <th class="py-3.5 px-4">Alasan Pemblokiran</th>
+                                <th class="py-3.5 px-4">Waktu Diblokir</th>
+                                <th class="py-3.5 px-4 text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="bannedIpsTableBody" class="divide-y divide-slate-100">
+                        <tbody id="bannedIpsTableBody" class="divide-y divide-slate-800/80">
                             <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat daftar IP terblokir...</td>
+                                <td colspan="5" class="py-8 text-center text-slate-500 text-xs">Memuat daftar IP terblokir...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -373,16 +466,16 @@
         <section id="view-logs" class="hidden flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 class="text-xl font-bold text-slate-900">Observability &amp; Log Serangan</h1>
-                    <p class="text-xs text-slate-500 mt-0.5">Rekaman percobaan SQL Injection, XSS, dan DDoS Flood yang dicegat mesin WardenWAF.</p>
+                    <h1 class="text-xl font-extrabold text-white">Observability &amp; Log Serangan</h1>
+                    <p class="text-xs text-slate-400 mt-0.5">Rekaman percobaan SQL Injection, XSS, dan DDoS Flood yang dicegat mesin WardenWAF.</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button id="clearAllLogsBtn" onclick="confirmClearAllLogs()"
-                        class="hidden px-3.5 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition">
+                        class="hidden px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 text-xs font-semibold transition">
                         Bersihkan Semua Log
                     </button>
                     <button onclick="loadLogs(true)"
-                        class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium transition">
+                        class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-xs font-medium transition">
                         Refresh Log
                     </button>
                 </div>
@@ -390,30 +483,30 @@
 
             <div class="flex flex-wrap items-center gap-2">
                 <input type="text" id="searchLogsInput" oninput="renderLogsTable()" placeholder="Cari IP penyerang atau domain..."
-                    class="w-full sm:w-72 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-orange-500">
+                    class="w-full sm:w-72 px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
                 <select id="filterThreatType" onchange="renderLogsTable()"
-                    class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-orange-500">
+                    class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:border-emerald-500">
                     <option value="all">Ancaman: Semua</option>
                     <option value="SQLi">SQLi / XSS</option>
                     <option value="DDoS">DDoS / Flood</option>
                 </select>
             </div>
 
-            <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+            <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/80 backdrop-blur-md">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr class="bg-slate-50/80 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                                <th class="py-3 px-4">Waktu Kejadian</th>
-                                <th class="py-3 px-4">IP Penyerang</th>
-                                <th class="py-3 px-4">Domain Target</th>
-                                <th class="py-3 px-4">Jenis Ancaman</th>
-                                <th id="logsActionHeader" class="hidden py-3 px-4 text-right">Aksi Admin</th>
+                            <tr class="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="py-3.5 px-4">Waktu Kejadian</th>
+                                <th class="py-3.5 px-4">IP Penyerang</th>
+                                <th class="py-3.5 px-4">Domain Target</th>
+                                <th class="py-3.5 px-4">Jenis Ancaman</th>
+                                <th id="logsActionHeader" class="hidden py-3.5 px-4 text-right">Aksi Admin</th>
                             </tr>
                         </thead>
-                        <tbody id="logsTableBody" class="divide-y divide-slate-100">
+                        <tbody id="logsTableBody" class="divide-y divide-slate-800/80">
                             <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat riwayat serangan...</td>
+                                <td colspan="5" class="py-8 text-center text-slate-500 text-xs">Memuat riwayat serangan...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -424,36 +517,36 @@
     </div>
 
     <!-- MODAL: TAMBAH DOMAIN BARU -->
-    <div id="addDomainModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h3 class="text-sm font-bold text-slate-900">Add a domain</h3>
-                <button onclick="closeAddDomainModal()" class="text-slate-400 hover:text-slate-700 text-lg leading-none">&times;</button>
+    <div id="addDomainModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-sm font-bold text-white">Add a domain</h3>
+                <button onclick="closeAddDomainModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
             </div>
             <form onsubmit="addDomain(event)" class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Domain / Subdomain</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Domain / Subdomain</label>
                     <input type="text" id="domainInput" required placeholder="Contoh: wardenwaf.indoneska.com"
-                        class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-orange-500">
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">URL / IP Server Asli (Origin Target)</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">URL / IP Server Asli (Origin Target)</label>
                     <input type="text" id="originInput" required placeholder="Contoh: https://relation.n-oceano22.workers.dev"
-                        class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:border-orange-500">
-                    <p class="text-[11px] text-slate-400 mt-1">Isi dengan alamat server tujuan yang ingin dilindungi.</p>
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                    <p class="text-[11px] text-slate-500 mt-1">Isi dengan alamat server tujuan yang ingin dilindungi.</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Batas Permintaan (Rate Limit / 10 Detik)</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Batas Permintaan (Rate Limit / 10 Detik)</label>
                     <input type="number" id="rateLimitInput" value="20" min="1" max="1000" required
-                        class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-orange-500">
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="closeAddDomainModal()"
-                        class="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition">
+                        class="px-4 py-2 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition">
                         Batal
                     </button>
                     <button type="submit"
-                        class="px-5 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition">
+                        class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition">
                         Daftarkan Domain
                     </button>
                 </div>
@@ -462,52 +555,52 @@
     </div>
 
     <!-- MODAL: EDIT KONFIGURASI DOMAIN (ADMIN) -->
-    <div id="editDomainModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h3 class="text-sm font-bold text-slate-900">Edit Konfigurasi Domain</h3>
-                <button onclick="closeEditDomainModal()" class="text-slate-400 hover:text-slate-700 text-lg leading-none">&times;</button>
+    <div id="editDomainModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-sm font-bold text-white">Edit Konfigurasi Domain</h3>
+                <button onclick="closeEditDomainModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
             </div>
             <form onsubmit="submitEditDomain(event)" class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">Nama Domain (Terkunci)</label>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Domain (Terkunci)</label>
                     <input type="text" id="editDomainName" readonly
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 cursor-not-allowed">
+                        class="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-sm font-semibold text-slate-400 cursor-not-allowed">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">URL / IP Server Asli (Origin)</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">URL / IP Server Asli (Origin)</label>
                     <input type="text" id="editOriginServer" required placeholder="https://relation.n-oceano22.workers.dev"
-                        class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:border-orange-500">
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-emerald-500">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Rate Limit (/10 Detik)</label>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Rate Limit (/10 Detik)</label>
                         <input type="number" id="editRateLimit" min="1" max="5000" required
-                            class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-orange-500">
+                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Status Persetujuan</label>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Status Persetujuan</label>
                         <select id="editStatus"
-                            class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-orange-500">
+                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
                             <option value="approved">ACC Admin (Disetujui)</option>
                             <option value="pending">Pending (Ditahan)</option>
                         </select>
                     </div>
                 </div>
-                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                <div class="flex items-center justify-between bg-slate-950/90 border border-slate-800 rounded-xl p-3.5">
                     <div>
-                        <div class="text-xs font-semibold text-slate-800">Perlindungan WAF &amp; JS Challenge</div>
+                        <div class="text-xs font-bold text-slate-200">Perlindungan WAF &amp; JS Challenge</div>
                         <div class="text-[11px] text-slate-500">Aktifkan penyaringan SQLi, XSS, dan verifikasi browser</div>
                     </div>
-                    <input type="checkbox" id="editWafEnabled" class="w-4 h-4 accent-orange-500 rounded cursor-pointer">
+                    <input type="checkbox" id="editWafEnabled" class="w-4 h-4 accent-emerald-500 rounded cursor-pointer">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="closeEditDomainModal()"
-                        class="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition">
+                        class="px-4 py-2 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition">
                         Batal
                     </button>
                     <button type="submit"
-                        class="px-5 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition">
+                        class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition">
                         Simpan Perubahan
                     </button>
                 </div>
@@ -516,35 +609,35 @@
     </div>
 
     <!-- MODAL: BLOKIR IP MANUAL (ADMIN) -->
-    <div id="manualBanModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                <h3 class="text-sm font-bold text-slate-900">Blokir Alamat IP Secara Permanen</h3>
-                <button onclick="closeManualBanModal()" class="text-slate-400 hover:text-slate-700 text-lg leading-none">&times;</button>
+    <div id="manualBanModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-sm font-bold text-white">Blokir Alamat IP Secara Permanen</h3>
+                <button onclick="closeManualBanModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
             </div>
             <form onsubmit="submitManualBan(event)" class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Alamat IP Target</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alamat IP Target</label>
                     <input type="text" id="banIpInput" required placeholder="Contoh: 103.45.67.89"
-                        class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:border-rose-600">
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Domain Terkait</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Domain Terkait</label>
                     <input type="text" id="banDomainInput" value="Semua Domain (Manual)"
-                        class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-rose-600">
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Alasan Pemblokiran</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alasan Pemblokiran</label>
                     <input type="text" id="banReasonInput" value="Diblokir Manual oleh Admin" required
-                        class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-rose-600">
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="closeManualBanModal()"
-                        class="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition">
+                        class="px-4 py-2 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition">
                         Batal
                     </button>
                     <button type="submit"
-                        class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition">
+                        class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition">
                         Kunci IP Permanen
                     </button>
                 </div>
@@ -553,17 +646,17 @@
     </div>
 
     <!-- MODAL: KONFIRMASI AKSI -->
-    <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-            <h3 id="confirmTitle" class="text-base font-bold text-slate-900">Konfirmasi</h3>
-            <p id="confirmDesc" class="text-xs text-slate-600 mt-2 leading-relaxed"></p>
+    <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 id="confirmTitle" class="text-base font-bold text-white">Konfirmasi</h3>
+            <p id="confirmDesc" class="text-xs text-slate-400 mt-2 leading-relaxed"></p>
             <div class="flex justify-end gap-2 mt-6">
                 <button onclick="closeConfirmModal()"
-                    class="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition">
+                    class="px-4 py-2 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition">
                     Batal
                 </button>
                 <button id="confirmActionBtn"
-                    class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition">
+                    class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition">
                     Ya, Lanjutkan
                 </button>
             </div>
@@ -604,13 +697,13 @@
             const container = document.getElementById("toastContainer");
             const el = document.createElement("div");
             const colors = type === "error"
-                ? "bg-rose-900 text-white border-rose-700"
+                ? "bg-rose-950/95 text-rose-200 border-rose-500/40"
                 : type === "info"
-                    ? "bg-slate-900 text-white border-slate-700"
-                    : "bg-emerald-900 text-white border-emerald-700";
+                    ? "bg-slate-900/95 text-slate-200 border-slate-700"
+                    : "bg-emerald-950/95 text-emerald-200 border-emerald-500/40";
 
-            el.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-lg text-xs font-semibold flex items-center gap-2.5 transition-all duration-300 ${colors}`;
-            el.innerHTML = `<span>${type === "error" ? "&#9888;" : "&#10003;"}</span><span>${escapeHtml(message)}</span>`;
+            el.className = `pointer-events-auto px-4 py-3 rounded-xl border backdrop-blur-md shadow-xl text-xs font-semibold flex items-center gap-2.5 transition-all duration-300 ${colors}`;
+            el.innerHTML = `<span class="${type === "error" ? "text-rose-400" : "text-emerald-400"}">${type === "error" ? "&#9888;" : "&#10003;"}</span><span>${escapeHtml(message)}</span>`;
             container.appendChild(el);
             setTimeout(() => {
                 el.style.opacity = "0";
@@ -682,9 +775,9 @@
                 }
                 if (navBtn) {
                     if (v === viewName) {
-                        navBtn.className = "side-nav w-full flex items-center justify-between px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-900 transition";
+                        navBtn.className = "side-nav w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 transition";
                     } else {
-                        navBtn.className = "side-nav w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition";
+                        navBtn.className = "side-nav w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition";
                     }
                 }
             });
@@ -745,15 +838,15 @@
             });
 
             if (results.length === 0) {
-                box.innerHTML = `<div class="px-4 py-3 text-xs text-slate-400">Tidak ada hasil untuk "${escapeHtml(q)}"</div>`;
+                box.innerHTML = `<div class="px-4 py-3 text-xs text-slate-500">Tidak ada hasil untuk "${escapeHtml(q)}"</div>`;
             } else {
                 box.innerHTML = results.map((r, idx) => `
-                    <button type="button" data-res-idx="${idx}" class="hero-res-item w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between transition">
+                    <button type="button" data-res-idx="${idx}" class="hero-res-item w-full px-4 py-2.5 text-left hover:bg-slate-800/80 flex items-center justify-between transition">
                         <div>
-                            <div class="text-xs font-semibold text-slate-900">${escapeHtml(r.title)}</div>
-                            <div class="text-[11px] text-slate-500 font-mono truncate max-w-md">${escapeHtml(r.subtitle)}</div>
+                            <div class="text-xs font-semibold text-white">${escapeHtml(r.title)}</div>
+                            <div class="text-[11px] text-slate-400 font-mono truncate max-w-md">${escapeHtml(r.subtitle)}</div>
                         </div>
-                        <span class="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-100 text-slate-600">${escapeHtml(r.category)}</span>
+                        <span class="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">${escapeHtml(r.category)}</span>
                     </button>
                 `).join("");
                 box.querySelectorAll(".hero-res-item").forEach(btn => {
@@ -775,7 +868,7 @@
                 document.getElementById("clearAllLogsBtn").classList.remove("hidden");
                 document.getElementById("logsActionHeader").classList.remove("hidden");
                 document.getElementById("overviewBannedCol").classList.remove("hidden");
-                document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-3 gap-8 pt-2";
+                document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-3 gap-6";
                 document.getElementById("userNoticeBanner").classList.add("hidden");
             } else {
                 document.getElementById("sidebarSecurityGroup").classList.add("hidden");
@@ -783,7 +876,7 @@
                 document.getElementById("clearAllLogsBtn").classList.add("hidden");
                 document.getElementById("logsActionHeader").classList.add("hidden");
                 document.getElementById("overviewBannedCol").classList.add("hidden");
-                document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2";
+                document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-2 gap-6";
                 document.getElementById("userNoticeBanner").classList.remove("hidden");
             }
 
@@ -804,7 +897,7 @@
             const now = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
             document.getElementById("lastSyncText").textContent = now;
             if (icon) setTimeout(() => icon.classList.remove("animate-spin"), 400);
-            if (notify) showToast("Seluruh data berhasil disinkronkan", "info");
+            if (notify) showToast("Seluruh simpul data berhasil disinkronkan", "info");
         }
 
         function renderOverviewLists() {
@@ -816,21 +909,21 @@
             document.getElementById("overviewBannedCount").textContent = bannedIpsCache.length;
 
             const activeWaf = domainsCache.filter(d => d.status === "approved" && d.waf_enabled).length;
-            document.getElementById("statActiveWafText").textContent = `${activeWaf} dari ${domainsCache.length} domain terlindungi WAF`;
+            document.getElementById("statActiveWafText").textContent = `${activeWaf} dari ${domainsCache.length} domain terlindungi`;
 
             // Overview Domains List
             const domContainer = document.getElementById("overviewDomainsList");
             if (domainsCache.length === 0) {
-                domContainer.innerHTML = '<div class="py-4 text-xs text-slate-400">Belum ada domain terdaftar.</div>';
+                domContainer.innerHTML = '<div class="py-4 text-xs text-slate-500">Belum ada domain terdaftar.</div>';
             } else {
                 domContainer.innerHTML = domainsCache.slice(0, 5).map(d => `
                     <button onclick="switchView('domains')" type="button"
-                        class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-50 transition group">
+                        class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-800/40 rounded-lg transition group">
                         <div class="flex items-center gap-2.5 min-w-0">
-                            <span class="w-2 h-2 rounded-full ${d.waf_enabled ? "bg-emerald-500" : "bg-amber-400"} shrink-0"></span>
-                            <span class="text-xs font-semibold text-slate-800 group-hover:text-orange-600 truncate">${escapeHtml(d.domain)}</span>
+                            <span class="w-2 h-2 rounded-full ${d.waf_enabled ? "bg-emerald-400 shadow-xs shadow-emerald-400" : "bg-amber-400"} shrink-0"></span>
+                            <span class="text-xs font-semibold text-slate-200 group-hover:text-emerald-400 truncate">${escapeHtml(d.domain)}</span>
                         </div>
-                        <span class="text-slate-400 group-hover:text-slate-700 text-xs ml-2">&rsaquo;</span>
+                        <span class="text-slate-500 group-hover:text-emerald-400 text-xs ml-2">&rsaquo;</span>
                     </button>
                 `).join("");
             }
@@ -838,16 +931,16 @@
             // Overview Banned IPs List
             const banContainer = document.getElementById("overviewBannedList");
             if (bannedIpsCache.length === 0) {
-                banContainer.innerHTML = '<div class="py-4 text-xs text-slate-400">Tidak ada IP yang diblokir saat ini.</div>';
+                banContainer.innerHTML = '<div class="py-4 text-xs text-slate-500">Tidak ada IP yang diblokir saat ini.</div>';
             } else {
                 banContainer.innerHTML = bannedIpsCache.slice(0, 5).map(b => `
                     <button onclick="switchView('banned')" type="button"
-                        class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-50 transition group">
+                        class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-800/40 rounded-lg transition group">
                         <div class="min-w-0">
-                            <div class="text-xs font-mono font-semibold text-slate-800 group-hover:text-rose-600 truncate">${escapeHtml(b.ip_address)}</div>
+                            <div class="text-xs font-mono font-semibold text-rose-400 group-hover:text-rose-300 truncate">${escapeHtml(b.ip_address)}</div>
                             <div class="text-[11px] text-slate-400 truncate">${escapeHtml(b.reason)}</div>
                         </div>
-                        <span class="text-slate-400 group-hover:text-slate-700 text-xs ml-2">&rsaquo;</span>
+                        <span class="text-slate-500 group-hover:text-rose-400 text-xs ml-2">&rsaquo;</span>
                     </button>
                 `).join("");
             }
@@ -855,18 +948,18 @@
             // Overview Attack Logs List
             const logContainer = document.getElementById("overviewLogsList");
             if (logsCache.length === 0) {
-                logContainer.innerHTML = '<div class="py-4 text-xs text-slate-400">Belum ada serangan terdeteksi.</div>';
+                logContainer.innerHTML = '<div class="py-4 text-xs text-slate-500">Belum ada serangan terdeteksi.</div>';
             } else {
                 logContainer.innerHTML = logsCache.slice(0, 5).map(l => `
                     <button onclick="switchView('logs')" type="button"
-                        class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-50 transition group">
+                        class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-800/40 rounded-lg transition group">
                         <div class="min-w-0">
-                            <div class="text-xs font-medium text-slate-800 group-hover:text-orange-600 truncate">
-                                <span class="text-slate-400">WAF /</span> <span class="font-mono font-semibold">${escapeHtml(l.ip_address)}</span>
+                            <div class="text-xs font-medium text-slate-200 group-hover:text-emerald-400 truncate">
+                                <span class="text-emerald-400/80 font-mono">WAF /</span> <span class="font-mono font-semibold">${escapeHtml(l.ip_address)}</span>
                             </div>
                             <div class="text-[11px] text-slate-400 truncate">${escapeHtml(l.threat_type)} &bull; ${escapeHtml(l.domain)}</div>
                         </div>
-                        <span class="text-slate-400 group-hover:text-slate-700 text-xs ml-2">&rsaquo;</span>
+                        <span class="text-slate-500 group-hover:text-emerald-400 text-xs ml-2">&rsaquo;</span>
                     </button>
                 `).join("");
             }
@@ -909,41 +1002,41 @@
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-400 text-xs">Tidak ada konfigurasi domain yang sesuai.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-500 text-xs">Tidak ada konfigurasi domain yang sesuai.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = filtered.map(d => {
                 const isApproved = d.status === "approved";
                 const statusBadge = isApproved
-                    ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Active (ACC)</span>'
-                    : '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">Pending</span>';
+                    ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Active (ACC)</span>'
+                    : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">Pending</span>';
 
                 const wafBadge = d.waf_enabled
-                    ? '<span class="inline-flex items-center gap-1.5 text-emerald-600 font-semibold text-xs"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>On</span>'
-                    : '<span class="inline-flex items-center gap-1.5 text-slate-400 font-medium text-xs"><span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>Off</span>';
+                    ? '<span class="inline-flex items-center gap-1.5 text-emerald-400 font-bold text-xs"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>On</span>'
+                    : '<span class="inline-flex items-center gap-1.5 text-slate-500 font-medium text-xs"><span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>Off</span>';
 
                 const approveBtn = (CURRENT_ROLE === "admin" && !isApproved)
-                    ? `<button onclick="approveDomain('${escapeHtml(d.domain)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-md text-xs font-semibold transition">ACC</button>`
+                    ? `<button onclick="approveDomain('${escapeHtml(d.domain)}')" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-bold transition">ACC</button>`
                     : "";
 
                 const editBtn = (CURRENT_ROLE === "admin")
-                    ? `<button onclick="openEditDomainModal('${escapeHtml(d.domain)}')" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-md text-xs font-semibold transition">Edit</button>`
+                    ? `<button onclick="openEditDomainModal('${escapeHtml(d.domain)}')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Edit</button>`
                     : "";
 
                 return `
-                    <tr class="hover:bg-slate-50/70 transition">
-                        <td class="py-3.5 px-4 font-semibold text-slate-900">${escapeHtml(d.domain)}</td>
-                        <td class="py-3.5 px-4 text-slate-600 font-mono text-xs">${escapeHtml(d.origin_server)}</td>
-                        <td class="py-3.5 px-4 text-xs text-slate-600">${escapeHtml(d.rate_limit)} req/10s</td>
-                        <td class="py-3.5 px-4"><span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-medium">${escapeHtml(d.owner)}</span></td>
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-3.5 px-4 font-bold text-white">${escapeHtml(d.domain)}</td>
+                        <td class="py-3.5 px-4 text-slate-300 font-mono text-xs">${escapeHtml(d.origin_server)}</td>
+                        <td class="py-3.5 px-4 text-xs font-mono text-slate-300">${escapeHtml(d.rate_limit)} req/10s</td>
+                        <td class="py-3.5 px-4"><span class="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-xs font-medium">${escapeHtml(d.owner)}</span></td>
                         <td class="py-3.5 px-4">${statusBadge}</td>
                         <td class="py-3.5 px-4">${wafBadge}</td>
                         <td class="py-3.5 px-4 text-right">
                             <div class="inline-flex items-center justify-end gap-1.5">
                                 ${approveBtn}
                                 ${editBtn}
-                                <button onclick="confirmDeleteDomain('${escapeHtml(d.domain)}')" class="bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-md text-xs font-semibold transition">
+                                <button onclick="confirmDeleteDomain('${escapeHtml(d.domain)}')" class="bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
                                     Hapus
                                 </button>
                             </div>
@@ -1079,19 +1172,19 @@
             );
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-400 text-xs">Tidak ada IP yang sedang diblokir permanen.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-500 text-xs">Tidak ada IP yang sedang diblokir permanen.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = filtered.map(item => `
-                <tr class="hover:bg-slate-50/70 transition">
-                    <td class="py-3.5 px-4 font-mono font-semibold text-rose-600">${escapeHtml(item.ip_address)}</td>
-                    <td class="py-3.5 px-4 text-slate-800 font-medium">${escapeHtml(item.domain)}</td>
-                    <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">${escapeHtml(item.reason)}</span></td>
-                    <td class="py-3.5 px-4 text-slate-500 text-xs font-mono">${escapeHtml(item.banned_at)}</td>
+                <tr class="hover:bg-slate-800/40 transition">
+                    <td class="py-3.5 px-4 font-mono font-bold text-rose-400">${escapeHtml(item.ip_address)}</td>
+                    <td class="py-3.5 px-4 text-slate-200 font-medium">${escapeHtml(item.domain)}</td>
+                    <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">${escapeHtml(item.reason)}</span></td>
+                    <td class="py-3.5 px-4 text-slate-400 text-xs font-mono">${escapeHtml(item.banned_at)}</td>
                     <td class="py-3.5 px-4 text-right">
                         <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}')"
-                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-md text-xs font-semibold transition">
+                            class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg text-xs font-bold transition">
                             Unblokir
                         </button>
                     </td>
@@ -1182,7 +1275,7 @@
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-400 text-xs">Tidak ada log serangan tercatat.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-500 text-xs">Tidak ada log serangan tercatat.</td></tr>';
                 return;
             }
 
@@ -1193,10 +1286,10 @@
                         <td class="py-3.5 px-4 text-right">
                             <div class="inline-flex items-center justify-end gap-1.5">
                                 ${!isAlreadyBanned
-                                    ? `<button onclick="openManualBanModal('${escapeHtml(l.ip_address)}', '${escapeHtml(l.domain)}')" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-md text-xs font-semibold transition">Blokir IP</button>`
-                                    : `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-400 text-[11px] font-medium">Sudah Diblokir</span>`
+                                    ? `<button onclick="openManualBanModal('${escapeHtml(l.ip_address)}', '${escapeHtml(l.domain)}')" class="bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Blokir IP</button>`
+                                    : `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[11px] font-medium">Sudah Diblokir</span>`
                                 }
-                                <button onclick="deleteSingleLog(${Number(l.id)})" class="bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-md text-xs font-semibold transition">
+                                <button onclick="deleteSingleLog(${Number(l.id)})" class="bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
                                     Hapus
                                 </button>
                             </div>
@@ -1205,11 +1298,11 @@
                     : "";
 
                 return `
-                    <tr class="hover:bg-slate-50/70 transition">
-                        <td class="py-3.5 px-4 text-xs text-slate-500 font-mono">${escapeHtml(l.timestamp)}</td>
-                        <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-800">${escapeHtml(l.ip_address)}</td>
-                        <td class="py-3.5 px-4 text-slate-700 font-medium">${escapeHtml(l.domain)}</td>
-                        <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">${escapeHtml(l.threat_type)}</span></td>
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-3.5 px-4 text-xs text-slate-400 font-mono">${escapeHtml(l.timestamp)}</td>
+                        <td class="py-3.5 px-4 font-mono text-xs font-bold text-white">${escapeHtml(l.ip_address)}</td>
+                        <td class="py-3.5 px-4 text-slate-300 font-medium">${escapeHtml(l.domain)}</td>
+                        <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">${escapeHtml(l.threat_type)}</span></td>
                         ${adminActions}
                     </tr>
                 `;
