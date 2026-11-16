@@ -8,6 +8,7 @@ import httpx
 import sqlite3
 import socket
 import psycopg2
+from urllib.parse import unquote
 from datetime import datetime
 from fastapi import FastAPI, Request, Response, HTTPException, Header
 from fastapi.responses import JSONResponse, HTMLResponse
@@ -33,6 +34,13 @@ def get_db():
 
 def q(query: str) -> str:
     return query.replace("?", "%s") if USE_POSTGRES else query
+
+def get_client_ip(request: Request) -> str:
+    """Mengambil IP asli pengunjung meskipun melewati load balancer Render."""
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 # --- 1. SETUP DATABASE ---
 def init_db():
@@ -61,6 +69,12 @@ def init_db():
             domain TEXT,
             threat_type TEXT
         )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS banned_ips (
+            ip_address TEXT PRIMARY KEY,
+            domain TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            banned_at TEXT NOT NULL
+        )''')
     else:
         cursor.execute('''CREATE TABLE IF NOT EXISTS clients (
             domain TEXT PRIMARY KEY,
@@ -83,6 +97,12 @@ def init_db():
             ip_address TEXT,
             domain TEXT,
             threat_type TEXT
+        )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS banned_ips (
+            ip_address TEXT PRIMARY KEY,
+            domain TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            banned_at TEXT NOT NULL
         )''')
     conn.commit()
     cursor.close()
@@ -108,13 +128,46 @@ class ChallengeVerifyData(BaseModel):
     ans: int
     sig: str
 
+# --- FUNGSI HELPER PEMBLOKIRAN PERMANEN ---
+def is_ip_banned(ip: str) -> Optional[str]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(q("SELECT reason FROM banned_ips WHERE ip_address=?"), (ip,))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return row[0] if row else None
+
+def ban_ip_permanently(ip: str, domain: str, reason: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if USE_POSTGRES:
+        cursor.execute(
+            """INSERT INTO banned_ips (ip_address, domain, reason, banned_at)
+               VALUES (%s, %s, %s, %s)
+               ON CONFLICT (ip_address) DO UPDATE SET
+                   domain = EXCLUDED.domain,
+                   reason = EXCLUDED.reason,
+                   banned_at = EXCLUDED.banned_at""",
+            (ip, domain, reason, now)
+        )
+    else:
+        cursor.execute(
+            "INSERT OR REPLACE INTO banned_ips (ip_address, domain, reason, banned_at) VALUES (?, ?, ?, ?)",
+            (ip, domain, reason, now)
+        )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
 # --- FUNGSI HELPER JS CHALLENGE ---
 def sign_challenge(ts: str, a: int, b: int, ans: int) -> str:
     payload = f"{ts}:{a}:{b}:{ans}".encode("utf-8")
     return hmac.new(WAF_SECRET.encode("utf-8"), payload, hashlib.sha256).hexdigest()
 
 def create_clearance_cookie(user_agent: str) -> str:
-    exp_ts = str(int(time.time()) + 1800)  # Berlaku 30 menit
+    exp_ts = str(int(time.time()) + 1800)
     payload = f"{user_agent}:{exp_ts}".encode("utf-8")
     sig = hmac.new(WAF_SECRET.encode("utf-8"), payload, hashlib.sha256).hexdigest()
     return f"{exp_ts}.{sig}"
@@ -142,6 +195,10 @@ async def dashboard_ui(request: Request):
 # --- ENDPOINT VERIFIKASI JS CHALLENGE ---
 @app.post("/__waf_verify")
 async def verify_js_challenge(data: ChallengeVerifyData, request: Request):
+    client_ip = get_client_ip(request)
+    if is_ip_banned(client_ip):
+        raise HTTPException(status_code=403, detail="IP Anda diblokir permanen.")
+
     try:
         if abs(int(time.time()) - int(data.ts)) > 300:
             raise HTTPException(status_code=400, detail="Challenge kedaluwarsa")
@@ -289,10 +346,43 @@ def get_attack_logs():
     conn.close()
     return [{"timestamp": r[0], "ip_address": r[1], "domain": r[2], "threat_type": r[3]} for r in rows]
 
+# --- ENDPOINT KHUSUS ADMIN: DAFTAR & UNBLOKIR IP PERMANEN ---
+@app.get("/admin/api/banned-ips")
+def get_banned_ips(x_role: str = Header(...)):
+    if x_role != 'admin':
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat melihat daftar IP terblokir")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ip_address, domain, reason, banned_at FROM banned_ips ORDER BY banned_at DESC")
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return [
+        {
+            "ip_address": r[0],
+            "domain": r[1],
+            "reason": r[2],
+            "banned_at": r[3]
+        }
+        for r in rows
+    ]
+
+@app.delete("/admin/api/banned-ips/{target_ip:path}")
+def unblock_ip(target_ip: str, x_role: str = Header(...)):
+    if x_role != 'admin':
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat membuka blokir IP")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(q("DELETE FROM banned_ips WHERE ip_address=?"), (target_ip,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    REQUEST_LOGS.pop(target_ip, None)
+    return {"status": "success", "message": f"Blokir untuk IP {target_ip} berhasil dibuka"}
+
 # --- ENGINE KEAMANAN (WAF & RATE LIMIT) ---
 TIME_WINDOW = 10 
 REQUEST_LOGS = {}
-PERMANENT_BANNED_IPS = set()
 WAF_PATTERNS = [
     r"(\%27)|(\')",
     r"((\%3D)|(=))[^\n]*(\%27|\')",
@@ -303,7 +393,8 @@ WAF_PATTERNS = [
 ]
 
 def is_malicious(text: str):
-    return any(re.search(p, text, re.IGNORECASE) for p in WAF_PATTERNS)
+    decoded = unquote(text)
+    return any(re.search(p, text, re.IGNORECASE) or re.search(p, decoded, re.IGNORECASE) for p in WAF_PATTERNS)
 
 def log_attack(ip: str, domain: str, threat: str):
     conn = get_db()
@@ -321,7 +412,7 @@ def log_attack(ip: str, domain: str, threat: str):
 async def reverse_proxy(request: Request, path: str):
     if str(request.url.path).startswith(("/admin/", "/api/")):
         return JSONResponse(status_code=404, content={"error": "Not Found"})
-    client_ip = request.client.host
+    client_ip = get_client_ip(request)
     host_header = request.headers.get("host", "").split(":")[0]
     
     conn = get_db()
@@ -338,23 +429,35 @@ async def reverse_proxy(request: Request, path: str):
     if client_config["status"] == "pending":
         return JSONResponse(status_code=403, content={"error": "Domain ini sedang menunggu persetujuan Admin."})
 
-    if client_ip in PERMANENT_BANNED_IPS:
-        return JSONResponse(status_code=403, content={"status": "blocked", "reason": "Banned"})
-    if client_config["waf_enabled"] and is_malicious(str(request.url)):
-        PERMANENT_BANNED_IPS.add(client_ip)
-        log_attack(client_ip, host_header, "SQLi/XSS Injection")
-        return JSONResponse(status_code=403, content={"status": "blocked", "reason": "Malicious payload detected"})
+    # 1. CEK APAKAH IP SUDAH TERBLOKIR PERMANEN DI DATABASE
+    banned_reason = is_ip_banned(client_ip)
+    if banned_reason:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "blocked",
+                "reason": f"IP Anda ({client_ip}) diblokir permanen karena {banned_reason}."
+            }
+        )
 
+    # 2. DETEKSI SERANGAN SQL INJECTION / XSS -> BLOKIR PERMANEN
+    if client_config["waf_enabled"] and is_malicious(str(request.url)):
+        ban_ip_permanently(client_ip, host_header, "SQLi/XSS Injection")
+        log_attack(client_ip, host_header, "SQLi/XSS Injection")
+        return JSONResponse(status_code=403, content={"status": "blocked", "reason": "Malicious payload detected - IP Banned Permanently"})
+
+    # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR PERMANEN
     current_time = time.time()
     REQUEST_LOGS.setdefault(client_ip, [])
     REQUEST_LOGS[client_ip] = [t for t in REQUEST_LOGS[client_ip] if current_time - t < TIME_WINDOW]
     if len(REQUEST_LOGS[client_ip]) >= client_config["rate_limit"]:
+        ban_ip_permanently(client_ip, host_header, "DDoS / Flood Rate Limit")
         log_attack(client_ip, host_header, "DDoS / Flood Rate Limit")
-        return JSONResponse(status_code=429, content={"status": "blocked", "reason": "Too many requests"})
+        return JSONResponse(status_code=429, content={"status": "blocked", "reason": "Too many requests - IP Banned Permanently"})
 
     REQUEST_LOGS[client_ip].append(current_time)
 
-    # --- TAMPILKAN HALAMAN VERIFIKASI JIKA BELUM ADA COOKIE ---
+    # 4. HALAMAN VERIFIKASI BROWSER (JS CHALLENGE)
     if client_config["waf_enabled"]:
         clearance_cookie = request.cookies.get("cf_mini_clearance")
         user_agent = request.headers.get("user-agent", "unknown")
