@@ -3,182 +3,358 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WardenWAF — Enterprise Security Dashboard</title>
+    <title>WardenWAF — Security Operations Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen font-sans">
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
 
-    <!-- NAVBAR -->
-    <nav class="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
-        <div class="max-w-6xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-slate-900 text-emerald-400 flex items-center justify-center shadow-sm">
-                    <svg class="w-5 h-5" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- TOP HEADER BAR -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-inner">
+                    <svg class="w-6 h-6" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 1L2 5.5V12.5C2 18.8 6.3 24.6 12 26C17.7 24.6 22 18.8 22 12.5V5.5L12 1Z" fill="currentColor"/>
                         <path d="M10.5 16L7.5 13L8.9 11.6L10.5 13.2L15.1 8.6L16.5 10L10.5 16Z" fill="#0F172A"/>
                     </svg>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg text-slate-900 leading-tight">WardenWAF</h1>
-                    <p class="text-xs text-slate-500">Enterprise Web Application Firewall &amp; Reverse Proxy</p>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-extrabold text-lg tracking-tight text-white">WardenWAF</h1>
+                        <span class="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Engine Active
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">Enterprise Web Application Firewall &amp; Reverse Proxy</p>
                 </div>
             </div>
-            <div id="userControls" class="hidden flex items-center gap-4">
-                <span class="text-sm text-slate-600">
-                    Halo, <strong id="displayUsername" class="text-slate-900"></strong>
-                    <span id="displayRole" class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 uppercase"></span>
-                </span>
-                <button onclick="logout()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+
+            <div id="userControls" class="hidden flex items-center gap-3 sm:gap-4">
+                <div class="text-right hidden sm:block">
+                    <div class="text-xs text-slate-400">Masuk sebagai</div>
+                    <div class="text-sm font-semibold text-white flex items-center justify-end gap-1.5">
+                        <span id="displayUsername"></span>
+                        <span id="displayRole" class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500 text-slate-950 uppercase"></span>
+                    </div>
+                </div>
+                <button onclick="syncAllData(true)" title="Muat Ulang Semua Data"
+                    class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition">
+                    <svg id="globalSyncIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+                <button onclick="logout()"
+                    class="px-3.5 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold transition">
                     Keluar
                 </button>
             </div>
         </div>
-    </nav>
+    </header>
 
-    <main class="max-w-6xl mx-auto px-4 py-8">
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        <!-- BAGIAN 1: LOGIN & REGISTER -->
-        <div id="authSection" class="max-w-md mx-auto bg-white border border-slate-200 rounded-xl p-6 shadow-sm mt-8">
-            <div class="flex border-b border-slate-200 mb-6">
-                <button id="tabLogin" onclick="switchAuthTab('login')" class="w-1/2 pb-3 text-sm font-bold border-b-2 border-slate-900 text-slate-900">
-                    Masuk (Login)
-                </button>
-                <button id="tabRegister" onclick="switchAuthTab('register')" class="w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700">
-                    Daftar Akun Baru
-                </button>
-            </div>
-
-            <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Username</label>
-                    <input type="text" id="authUsername" required placeholder="Masukkan username"
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-slate-900">
+        <!-- AUTHENTICATION VIEW -->
+        <div id="authSection" class="max-w-md mx-auto mt-10">
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
+                <div class="bg-slate-900 px-6 py-5 text-white">
+                    <h2 class="text-base font-bold">Portal Kendali Keamanan</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Masuk untuk mengelola perlindungan domain dan lalu lintas proksi.</p>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Password</label>
-                    <input type="password" id="authPassword" required placeholder="Masukkan password"
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-slate-900">
-                </div>
-                <div id="authMessage" class="hidden text-xs font-medium p-3 rounded-lg"></div>
-                <button type="submit" id="authSubmitBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-sm">
-                    Masuk ke Dashboard
-                </button>
-            </form>
-        </div>
 
-        <!-- BAGIAN 2: KONTEN UTAMA DASHBOARD -->
-        <div id="dashboardSection" class="hidden space-y-6">
-
-            <!-- FORM PENGAJUAN DOMAIN BARU -->
-            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <span class="text-emerald-600">&#10148;</span> Ajukan Perlindungan Domain Baru
-                </h2>
-                <form onsubmit="addDomain(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                    <div class="md:col-span-4">
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nama Domain</label>
-                        <input type="text" id="domainInput" required placeholder="Contoh: api.klien.com"
-                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-900">
-                    </div>
-                    <div class="md:col-span-5">
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">IP/URL Server Asli (Origin)</label>
-                        <input type="text" id="originInput" placeholder="Contoh: http://192.168.1.5 (Kosongkan = Auto IP)"
-                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-900">
-                    </div>
-                    <div class="md:col-span-1">
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Limit /10s</label>
-                        <input type="number" id="rateLimitInput" value="20" min="1" required
-                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-900">
-                    </div>
-                    <div class="md:col-span-2">
-                        <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition shadow-sm">
-                            Kirim Pengajuan
+                <div class="p-6">
+                    <div class="grid grid-cols-2 bg-slate-100 p-1 rounded-xl mb-6">
+                        <button id="tabLogin" onclick="switchAuthTab('login')"
+                            class="py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition">
+                            Masuk (Login)
+                        </button>
+                        <button id="tabRegister" onclick="switchAuthTab('register')"
+                            class="py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition">
+                            Daftar Akun
                         </button>
                     </div>
-                </form>
-                <p id="userNotice" class="hidden mt-3 text-xs text-amber-600">
-                    &#9432; Domain yang diajukan akan berstatus <strong>Menunggu Persetujuan Admin</strong> dan WAF belum diaktifkan.
-                </p>
+
+                    <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Username</label>
+                            <input type="text" id="authUsername" required placeholder="Contoh: admin"
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Password</label>
+                            <input type="password" id="authPassword" required placeholder="••••••••"
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900">
+                        </div>
+                        <div id="authMessage" class="hidden text-xs font-medium p-3 rounded-xl"></div>
+                        <button type="submit" id="authSubmitBtn"
+                            class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm">
+                            Masuk ke Dashboard
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboardSection" class="hidden space-y-6">
+
+            <!-- KPI SUMMARY CARDS -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Domain</p>
+                        <p id="statTotalDomains" class="text-2xl font-extrabold text-slate-900 mt-1">0</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Terdaftar di Reverse Proxy</p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">WAF Terlindungi</p>
+                        <p id="statActiveWaf" class="text-2xl font-extrabold text-emerald-600 mt-1">0</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Status ACC &amp; JS Challenge</p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div id="statBannedCard" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">IP Blokir Permanen</p>
+                        <p id="statBannedIps" class="text-2xl font-extrabold text-rose-600 mt-1">0</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Terkunci di Database</p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Serangan Ditahan</p>
+                        <p id="statTotalLogs" class="text-2xl font-extrabold text-amber-600 mt-1">0</p>
+                        <p class="text-xs text-slate-400 mt-0.5">SQLi, XSS &amp; Flood DDoS</p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                </div>
             </div>
 
-            <!-- TABEL DAFTAR KONFIGURASI PROKSI -->
-            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-base font-bold text-slate-900">Daftar Konfigurasi Proksi</h2>
-                    <button onclick="loadDomains()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium">
-                        Refresh
+            <!-- NAVIGATION FILTER TABS -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl p-2 shadow-sm">
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <button onclick="setSectionView('all')" id="nav-all"
+                        class="nav-pill px-3.5 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white transition">
+                        Semua Panel
+                    </button>
+                    <button onclick="setSectionView('domains')" id="nav-domains"
+                        class="nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Konfigurasi Domain
+                    </button>
+                    <button onclick="setSectionView('banned')" id="nav-banned"
+                        class="nav-pill hidden px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Blokir IP Permanen
+                    </button>
+                    <button onclick="setSectionView('logs')" id="nav-logs"
+                        class="nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Log Serangan
                     </button>
                 </div>
+                <div class="px-3 text-xs text-slate-400 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span id="lastSyncText">Sinkronisasi otomatis aktif</span>
+                </div>
+            </div>
+
+            <!-- SECTION 1: DOMAIN MANAGEMENT -->
+            <div id="panelDomains" class="space-y-6">
+                <!-- FORM TAMBAH DOMAIN -->
+                <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">Tambah Perlindungan Domain</h2>
+                            <p class="text-xs text-slate-500">Daftarkan domain atau subdomain untuk dilewatkan melalui Reverse Proxy WardenWAF.</p>
+                        </div>
+                        <span id="userNotice" class="hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+                            Menunggu ACC Admin sebelum WAF aktif
+                        </span>
+                    </div>
+
+                    <form onsubmit="addDomain(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nama Domain</label>
+                            <input type="text" id="domainInput" required placeholder="Contoh: app.domainanda.com"
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">URL / IP Server Asli (Origin)</label>
+                            <input type="text" id="originInput" placeholder="Contoh: https://origin-anda.com"
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Rate Limit (/10s)</label>
+                            <input type="number" id="rateLimitInput" value="20" min="1" max="1000" required
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                        </div>
+                        <div class="md:col-span-2">
+                            <button type="submit"
+                                class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-1.5">
+                                <span>+ Daftarkan</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- TABEL KONFIGURASI PROKSI -->
+                <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">Daftar Konfigurasi Proksi</h2>
+                            <p class="text-xs text-slate-500">Kelola status persetujuan, target server asli, dan batas kuota akses tiap domain.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="text" id="searchDomainInput" oninput="renderDomainsTable()" placeholder="Cari domain / origin..."
+                                class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
+                            <select id="filterDomainStatus" onchange="renderDomainsTable()"
+                                class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-900">
+                                <option value="all">Semua Status</option>
+                                <option value="approved">ACC Admin</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                            <button onclick="loadDomains(true)"
+                                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                    <th class="py-3.5 px-4">Domain Client</th>
+                                    <th class="py-3.5 px-4">Origin Target</th>
+                                    <th class="py-3.5 px-4">Limit /10s</th>
+                                    <th class="py-3.5 px-4">Pemilik</th>
+                                    <th class="py-3.5 px-4">Status</th>
+                                    <th class="py-3.5 px-4">WAF</th>
+                                    <th class="py-3.5 px-4 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="domainsTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="7" class="py-8 text-center text-slate-400 text-xs">Memuat konfigurasi domain...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: BANNED IPS (ADMIN ONLY) -->
+            <div id="panelBannedIps" class="hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-rose-50/30">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-slate-900">Daftar IP Terblokir Permanen</h2>
+                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-100 text-rose-700">Admin Control</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">IP yang terdeteksi menyerang otomatis dikunci permanen hingga di-unblokir oleh admin.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="text" id="searchBannedInput" oninput="renderBannedTable()" placeholder="Cari IP / alasan..."
+                            class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
+                        <button onclick="openManualBanModal()"
+                            class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition shadow-sm">
+                            + Blokir IP Manual
+                        </button>
+                        <button onclick="loadBannedIps(true)"
+                            class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition">
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
-                                <th class="py-3 px-3">Domain Client</th>
-                                <th class="py-3 px-3">Origin Target</th>
-                                <th class="py-3 px-3">Pemilik</th>
-                                <th class="py-3 px-3">Status Persetujuan</th>
-                                <th class="py-3 px-3">WAF</th>
-                                <th class="py-3 px-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="domainsTableBody" class="divide-y divide-slate-100">
-                            <tr>
-                                <td colspan="6" class="py-6 text-center text-slate-400">Memuat data domain...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- PANEL KHUSUS ADMIN: DAFTAR IP TERBLOKIR PERMANEN -->
-            <div id="bannedIpsSection" class="hidden bg-white border border-red-200 rounded-xl p-6 shadow-sm">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-base font-bold text-red-700">Daftar IP Terblokir Permanen (Admin)</h2>
-                    <button onclick="loadBannedIps()" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-medium">
-                        Refresh
-                    </button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
-                                <th class="py-3 px-3">Alamat IP</th>
-                                <th class="py-3 px-3">Domain Target</th>
-                                <th class="py-3 px-3">Alasan Blokir</th>
-                                <th class="py-3 px-3">Waktu Diblokir</th>
-                                <th class="py-3 px-3 text-right">Aksi</th>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <th class="py-3.5 px-4">Alamat IP</th>
+                                <th class="py-3.5 px-4">Domain Target</th>
+                                <th class="py-3.5 px-4">Alasan Pemblokiran</th>
+                                <th class="py-3.5 px-4">Waktu Diblokir</th>
+                                <th class="py-3.5 px-4 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="bannedIpsTableBody" class="divide-y divide-slate-100">
                             <tr>
-                                <td colspan="5" class="py-6 text-center text-slate-400">Memuat daftar IP terblokir...</td>
+                                <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat daftar IP terblokir...</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- TABEL LOG SERANGAN -->
-            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-base font-bold text-slate-900">Log Serangan Terdeteksi</h2>
-                    <button onclick="loadLogs()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium">
-                        Refresh
-                    </button>
+            <!-- SECTION 3: ATTACK LOGS -->
+            <div id="panelLogs" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Log Serangan Terdeteksi</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Rekaman percobaan SQL Injection, XSS, dan DDoS Flood yang diblokir oleh mesin WAF.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="text" id="searchLogsInput" oninput="renderLogsTable()" placeholder="Cari IP / domain..."
+                            class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
+                        <select id="filterThreatType" onchange="renderLogsTable()"
+                            class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-900">
+                            <option value="all">Semua Ancaman</option>
+                            <option value="SQLi">SQLi / XSS</option>
+                            <option value="DDoS">DDoS / Flood</option>
+                        </select>
+                        <button id="clearAllLogsBtn" onclick="confirmClearAllLogs()"
+                            class="hidden px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition">
+                            Bersihkan Semua Log
+                        </button>
+                        <button onclick="loadLogs(true)"
+                            class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">
+                            Refresh
+                        </button>
+                    </div>
                 </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
-                                <th class="py-3 px-3">Waktu</th>
-                                <th class="py-3 px-3">IP Penyerang</th>
-                                <th class="py-3 px-3">Domain Target</th>
-                                <th class="py-3 px-3">Jenis Ancaman</th>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <th class="py-3.5 px-4">Waktu Kejadian</th>
+                                <th class="py-3.5 px-4">IP Penyerang</th>
+                                <th class="py-3.5 px-4">Domain Target</th>
+                                <th class="py-3.5 px-4">Jenis Ancaman</th>
+                                <th id="logsActionHeader" class="hidden py-3.5 px-4 text-right">Aksi Admin</th>
                             </tr>
                         </thead>
                         <tbody id="logsTableBody" class="divide-y divide-slate-100">
                             <tr>
-                                <td colspan="4" class="py-6 text-center text-slate-400">Belum ada serangan tercatat.</td>
+                                <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat riwayat log serangan...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -188,9 +364,172 @@
         </div>
     </main>
 
+    <!-- MODAL: EDIT KONFIGURASI DOMAIN (ADMIN) -->
+    <div id="editDomainModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+            <div class="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
+                <h3 class="text-sm font-bold">Edit Konfigurasi Domain</h3>
+                <button onclick="closeEditDomainModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+            </div>
+            <form onsubmit="submitEditDomain(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Domain (Terkunci)</label>
+                    <input type="text" id="editDomainName" readonly
+                        class="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">URL / IP Server Asli (Origin)</label>
+                    <input type="text" id="editOriginServer" required placeholder="https://server-asli.com"
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono focus:outline-none focus:border-slate-900">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Rate Limit (/10 Detik)</label>
+                        <input type="number" id="editRateLimit" min="1" max="5000" required
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Status Persetujuan</label>
+                        <select id="editStatus"
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                            <option value="approved">ACC Admin (Disetujui)</option>
+                            <option value="pending">Pending (Ditahan)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                    <div>
+                        <div class="text-xs font-bold text-slate-800">Perlindungan WAF &amp; JS Challenge</div>
+                        <div class="text-[11px] text-slate-500">Aktifkan penyaringan SQLi, XSS, dan verifikasi browser</div>
+                    </div>
+                    <input type="checkbox" id="editWafEnabled" class="w-5 h-5 accent-emerald-600 rounded cursor-pointer">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeEditDomainModal()"
+                        class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-sm">
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: BLOKIR IP MANUAL (ADMIN) -->
+    <div id="manualBanModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="bg-rose-700 px-6 py-4 flex items-center justify-between text-white">
+                <h3 class="text-sm font-bold">Blokir Alamat IP Secara Permanen</h3>
+                <button onclick="closeManualBanModal()" class="text-rose-200 hover:text-white text-lg leading-none">&times;</button>
+            </div>
+            <form onsubmit="submitManualBan(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Alamat IP Target</label>
+                    <input type="text" id="banIpInput" required placeholder="Contoh: 103.45.67.89"
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono focus:outline-none focus:border-rose-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Domain Terkait</label>
+                    <input type="text" id="banDomainInput" value="Semua Domain (Manual)"
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-rose-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Alasan Pemblokiran</label>
+                    <input type="text" id="banReasonInput" value="Diblokir Manual oleh Admin" required
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-rose-600">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeManualBanModal()"
+                        class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition shadow-sm">
+                        Kunci IP Permanen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: KONFIRMASI AKSI -->
+    <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 id="confirmTitle" class="text-base font-bold text-slate-900">Konfirmasi</h3>
+            <p id="confirmDesc" class="text-xs text-slate-600 mt-2 leading-relaxed"></p>
+            <div class="flex justify-end gap-2 mt-6">
+                <button onclick="closeConfirmModal()"
+                    class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                    Batal
+                </button>
+                <button id="confirmActionBtn"
+                    class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition">
+                    Ya, Lanjutkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
     <script>
         let authMode = "login";
+        let domainsCache = [];
+        let bannedIpsCache = [];
+        let logsCache = [];
+        let confirmCallback = null;
 
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function showToast(message, type = "success") {
+            const container = document.getElementById("toastContainer");
+            const el = document.createElement("div");
+            const colors = type === "error"
+                ? "bg-rose-900 text-white border-rose-700"
+                : type === "info"
+                    ? "bg-slate-900 text-white border-slate-700"
+                    : "bg-emerald-900 text-white border-emerald-700";
+
+            el.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-lg text-xs font-semibold flex items-center gap-2.5 transition-all duration-300 ${colors}`;
+            el.innerHTML = `<span>${type === "error" ? "&#9888;" : "&#10003;"}</span><span>${escapeHtml(message)}</span>`;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = "0";
+                setTimeout(() => el.remove(), 300);
+            }, 3200);
+        }
+
+        function openConfirmModal(title, desc, btnLabel, onConfirm) {
+            document.getElementById("confirmTitle").textContent = title;
+            document.getElementById("confirmDesc").textContent = desc;
+            const btn = document.getElementById("confirmActionBtn");
+            btn.textContent = btnLabel;
+            confirmCallback = onConfirm;
+            btn.onclick = async () => {
+                closeConfirmModal();
+                if (confirmCallback) await confirmCallback();
+            };
+            document.getElementById("confirmModal").classList.remove("hidden");
+        }
+
+        function closeConfirmModal() {
+            document.getElementById("confirmModal").classList.add("hidden");
+            confirmCallback = null;
+        }
+
+        // --- AUTHENTICATION ---
         function switchAuthTab(mode) {
             authMode = mode;
             const tabLogin = document.getElementById("tabLogin");
@@ -200,13 +539,13 @@
             msgBox.classList.add("hidden");
 
             if (mode === "login") {
-                tabLogin.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-slate-900 text-slate-900";
-                tabRegister.className = "w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700";
+                tabLogin.className = "py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition";
+                tabRegister.className = "py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition";
                 submitBtn.textContent = "Masuk ke Dashboard";
             } else {
-                tabRegister.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-slate-900 text-slate-900";
-                tabLogin.className = "w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700";
-                submitBtn.textContent = "Daftar Akun Baru";
+                tabRegister.className = "py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition";
+                tabLogin.className = "py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition";
+                submitBtn.textContent = "Buat Akun Baru";
             }
         }
 
@@ -226,24 +565,25 @@
                 const data = await res.json();
 
                 if (!res.ok) {
-                    msgBox.textContent = data.detail || "Terjadi kesalahan.";
-                    msgBox.className = "text-xs font-medium p-3 rounded-lg bg-red-50 text-red-600 border border-red-200";
+                    msgBox.textContent = data.detail || "Autentikasi gagal.";
+                    msgBox.className = "text-xs font-medium p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200";
                     return;
                 }
 
                 if (authMode === "register") {
-                    msgBox.textContent = "Akun berhasil dibuat! Silakan login.";
-                    msgBox.className = "text-xs font-medium p-3 rounded-lg bg-green-50 text-green-700 border border-green-200";
+                    msgBox.textContent = "Akun berhasil didaftarkan. Silakan masuk.";
+                    msgBox.className = "text-xs font-medium p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200";
                     switchAuthTab("login");
                     return;
                 }
 
                 localStorage.setItem("username", data.username);
                 localStorage.setItem("role", data.role);
+                showToast(`Selamat datang, ${data.username}`);
                 initDashboard();
             } catch (err) {
-                msgBox.textContent = "Gagal terhubung ke server.";
-                msgBox.className = "text-xs font-medium p-3 rounded-lg bg-red-50 text-red-600 border border-red-200";
+                msgBox.textContent = "Tidak dapat terhubung ke server.";
+                msgBox.className = "text-xs font-medium p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200";
             }
         }
 
@@ -253,7 +593,42 @@
             location.reload();
         }
 
-        function initDashboard() {
+        // --- SECTION NAVIGATION ---
+        function setSectionView(view) {
+            const role = localStorage.getItem("role");
+            document.querySelectorAll(".nav-pill").forEach(btn => {
+                btn.className = "nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition";
+            });
+            const activeBtn = document.getElementById(`nav-${view}`);
+            if (activeBtn) {
+                activeBtn.className = "nav-pill px-3.5 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white transition";
+            }
+
+            const pDomains = document.getElementById("panelDomains");
+            const pBanned = document.getElementById("panelBannedIps");
+            const pLogs = document.getElementById("panelLogs");
+
+            if (view === "all") {
+                pDomains.classList.remove("hidden");
+                pLogs.classList.remove("hidden");
+                if (role === "admin") pBanned.classList.remove("hidden");
+            } else if (view === "domains") {
+                pDomains.classList.remove("hidden");
+                pBanned.classList.add("hidden");
+                pLogs.classList.add("hidden");
+            } else if (view === "banned" && role === "admin") {
+                pDomains.classList.add("hidden");
+                pBanned.classList.remove("hidden");
+                pLogs.classList.add("hidden");
+            } else if (view === "logs") {
+                pDomains.classList.add("hidden");
+                pBanned.classList.add("hidden");
+                pLogs.classList.remove("hidden");
+            }
+        }
+
+        // --- INITIALIZE DASHBOARD ---
+        async function initDashboard() {
             const username = localStorage.getItem("username");
             const role = localStorage.getItem("role");
 
@@ -272,61 +647,123 @@
             document.getElementById("displayRole").textContent = role;
 
             if (role === "admin") {
-                document.getElementById("bannedIpsSection").classList.remove("hidden");
+                document.getElementById("panelBannedIps").classList.remove("hidden");
+                document.getElementById("nav-banned").classList.remove("hidden");
+                document.getElementById("clearAllLogsBtn").classList.remove("hidden");
+                document.getElementById("logsActionHeader").classList.remove("hidden");
                 document.getElementById("userNotice").classList.add("hidden");
-                loadBannedIps();
+                document.getElementById("statBannedCard").classList.remove("opacity-60");
             } else {
-                document.getElementById("bannedIpsSection").classList.add("hidden");
+                document.getElementById("panelBannedIps").classList.add("hidden");
+                document.getElementById("nav-banned").classList.add("hidden");
+                document.getElementById("clearAllLogsBtn").classList.add("hidden");
+                document.getElementById("logsActionHeader").classList.add("hidden");
                 document.getElementById("userNotice").classList.remove("hidden");
+                document.getElementById("statBannedCard").classList.add("opacity-60");
             }
 
-            loadDomains();
-            loadLogs();
+            await syncAllData(false);
         }
 
-        async function loadDomains() {
+        async function syncAllData(notify = false) {
+            const role = localStorage.getItem("role");
+            const icon = document.getElementById("globalSyncIcon");
+            if (icon) icon.classList.add("animate-spin");
+
+            await Promise.all([
+                loadDomains(false),
+                loadLogs(false),
+                role === "admin" ? loadBannedIps(false) : Promise.resolve()
+            ]);
+
+            updateStats();
+            const now = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            document.getElementById("lastSyncText").textContent = `Diperbarui pukul ${now}`;
+            if (icon) setTimeout(() => icon.classList.remove("animate-spin"), 400);
+            if (notify) showToast("Seluruh data berhasil disinkronkan", "info");
+        }
+
+        function updateStats() {
+            document.getElementById("statTotalDomains").textContent = domainsCache.length;
+            const activeCount = domainsCache.filter(d => d.status === "approved" && d.waf_enabled).length;
+            document.getElementById("statActiveWaf").textContent = activeCount;
+            document.getElementById("statBannedIps").textContent = bannedIpsCache.length;
+            document.getElementById("statTotalLogs").textContent = logsCache.length;
+        }
+
+        // --- DOMAIN CRUD ---
+        async function loadDomains(notify = false) {
             const username = localStorage.getItem("username");
             const role = localStorage.getItem("role");
             if (!username || !role) return;
 
-            const res = await fetch("/admin/api/domains", {
-                headers: { "x-role": role, "x-username": username }
-            });
-            if (!res.ok) return;
-            const domains = await res.json();
+            try {
+                const res = await fetch("/admin/api/domains", {
+                    headers: { "x-role": role, "x-username": username }
+                });
+                if (!res.ok) return;
+                domainsCache = await res.json();
+                renderDomainsTable();
+                updateStats();
+                if (notify) showToast("Daftar domain diperbarui", "info");
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderDomainsTable() {
+            const role = localStorage.getItem("role");
+            const query = (document.getElementById("searchDomainInput").value || "").toLowerCase();
+            const statusFilter = document.getElementById("filterDomainStatus").value;
             const tbody = document.getElementById("domainsTableBody");
 
-            if (domains.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-400">Belum ada domain yang didaftarkan.</td></tr>';
+            const filtered = domainsCache.filter(d => {
+                const matchText = d.domain.toLowerCase().includes(query) ||
+                                  d.origin_server.toLowerCase().includes(query) ||
+                                  d.owner.toLowerCase().includes(query);
+                const matchStatus = statusFilter === "all" || d.status === statusFilter;
+                return matchText && matchStatus;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400 text-xs">Tidak ada konfigurasi domain yang sesuai.</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = domains.map(d => {
+            tbody.innerHTML = filtered.map(d => {
                 const isApproved = d.status === "approved";
                 const statusBadge = isApproved
-                    ? '<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700">&#10003; ACC Admin</span>'
-                    : '<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700">Pending</span>';
+                    ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">&#10003; ACC Admin</span>'
+                    : '<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Pending</span>';
 
                 const wafBadge = d.waf_enabled
-                    ? '<span class="text-emerald-600 font-semibold text-xs">Aktif</span>'
-                    : '<span class="text-slate-400 font-semibold text-xs">Nonaktif</span>';
+                    ? '<span class="inline-flex items-center gap-1.5 text-emerald-600 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Aktif</span>'
+                    : '<span class="inline-flex items-center gap-1.5 text-slate-400 font-semibold text-xs"><span class="w-2 h-2 rounded-full bg-slate-300"></span>Nonaktif</span>';
 
                 const approveBtn = (role === "admin" && !isApproved)
-                    ? `<button onclick="approveDomain('${d.domain}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs font-semibold mr-1">ACC</button>`
+                    ? `<button onclick="approveDomain('${escapeHtml(d.domain)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-xs font-semibold transition">ACC</button>`
+                    : "";
+
+                const editBtn = (role === "admin")
+                    ? `<button onclick="openEditDomainModal('${escapeHtml(d.domain)}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Edit</button>`
                     : "";
 
                 return `
-                    <tr class="hover:bg-slate-50">
-                        <td class="py-3 px-3 font-semibold text-slate-900">${d.domain}</td>
-                        <td class="py-3 px-3 text-slate-500 font-mono text-xs">${d.origin_server}</td>
-                        <td class="py-3 px-3"><span class="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-xs font-semibold">${d.owner}</span></td>
-                        <td class="py-3 px-3">${statusBadge}</td>
-                        <td class="py-3 px-3">${wafBadge}</td>
-                        <td class="py-3 px-3 text-right">
-                            ${approveBtn}
-                            <button onclick="deleteDomain('${d.domain}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1 rounded text-xs font-semibold">
-                                Hapus
-                            </button>
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3.5 px-4 font-bold text-slate-900">${escapeHtml(d.domain)}</td>
+                        <td class="py-3.5 px-4 text-slate-600 font-mono text-xs">${escapeHtml(d.origin_server)}</td>
+                        <td class="py-3.5 px-4 text-xs font-semibold text-slate-700">${escapeHtml(d.rate_limit)} req/10s</td>
+                        <td class="py-3.5 px-4"><span class="px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-md text-xs font-semibold">${escapeHtml(d.owner)}</span></td>
+                        <td class="py-3.5 px-4">${statusBadge}</td>
+                        <td class="py-3.5 px-4">${wafBadge}</td>
+                        <td class="py-3.5 px-4 text-right">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                ${approveBtn}
+                                ${editBtn}
+                                <button onclick="confirmDeleteDomain('${escapeHtml(d.domain)}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
+                                    Hapus
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -354,9 +791,55 @@
             if (res.ok) {
                 document.getElementById("domainInput").value = "";
                 document.getElementById("originInput").value = "";
-                loadDomains();
+                showToast(`Domain ${domain} berhasil didaftarkan`);
+                await loadDomains(false);
             } else {
-                alert("Gagal menambahkan domain.");
+                showToast("Gagal mendaftarkan domain", "error");
+            }
+        }
+
+        function openEditDomainModal(domainName) {
+            const item = domainsCache.find(d => d.domain === domainName);
+            if (!item) return;
+
+            document.getElementById("editDomainName").value = item.domain;
+            document.getElementById("editOriginServer").value = item.origin_server;
+            document.getElementById("editRateLimit").value = item.rate_limit;
+            document.getElementById("editStatus").value = item.status;
+            document.getElementById("editWafEnabled").checked = Boolean(item.waf_enabled);
+
+            document.getElementById("editDomainModal").classList.remove("hidden");
+        }
+
+        function closeEditDomainModal() {
+            document.getElementById("editDomainModal").classList.add("hidden");
+        }
+
+        async function submitEditDomain(e) {
+            e.preventDefault();
+            const role = localStorage.getItem("role");
+            const domain = document.getElementById("editDomainName").value;
+            const origin_server = document.getElementById("editOriginServer").value.trim().replace(/\/$/, "");
+            const rate_limit = parseInt(document.getElementById("editRateLimit").value, 10) || 20;
+            const status = document.getElementById("editStatus").value;
+            const waf_enabled = document.getElementById("editWafEnabled").checked;
+
+            const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-role": role
+                },
+                body: JSON.stringify({ origin_server, rate_limit, status, waf_enabled })
+            });
+
+            if (res.ok) {
+                closeEditDomainModal();
+                showToast(`Konfigurasi ${domain} diperbarui`);
+                await loadDomains(false);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast(err.detail || "Gagal menyimpan perubahan", "error");
             }
         }
 
@@ -366,44 +849,76 @@
                 method: "PUT",
                 headers: { "x-role": role }
             });
-            if (res.ok) loadDomains();
+            if (res.ok) {
+                showToast(`Domain ${domain} telah di-ACC`);
+                await loadDomains(false);
+            }
         }
 
-        async function deleteDomain(domain) {
-            if (!confirm(`Hapus domain ${domain}?`)) return;
-            const username = localStorage.getItem("username");
-            const role = localStorage.getItem("role");
-            const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}`, {
-                method: "DELETE",
-                headers: { "x-role": role, "x-username": username }
-            });
-            if (res.ok) loadDomains();
+        function confirmDeleteDomain(domain) {
+            openConfirmModal(
+                "Hapus Konfigurasi Domain",
+                `Apakah Anda yakin ingin menghapus ${domain} dari WardenWAF? Lalu lintas untuk domain ini tidak akan diteruskan lagi.`,
+                "Hapus Domain",
+                async () => {
+                    const username = localStorage.getItem("username");
+                    const role = localStorage.getItem("role");
+                    const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}`, {
+                        method: "DELETE",
+                        headers: { "x-role": role, "x-username": username }
+                    });
+                    if (res.ok) {
+                        showToast(`Domain ${domain} dihapus`);
+                        await loadDomains(false);
+                    }
+                }
+            );
         }
 
-        async function loadBannedIps() {
+        // --- BANNED IPS MANAGEMENT (ADMIN) ---
+        async function loadBannedIps(notify = false) {
             const role = localStorage.getItem("role");
             if (role !== "admin") return;
 
-            const res = await fetch("/admin/api/banned-ips", {
-                headers: { "x-role": role }
-            });
-            if (!res.ok) return;
-            const list = await res.json();
+            try {
+                const res = await fetch("/admin/api/banned-ips", {
+                    headers: { "x-role": role }
+                });
+                if (!res.ok) return;
+                bannedIpsCache = await res.json();
+                renderBannedTable();
+                renderLogsTable();
+                updateStats();
+                if (notify) showToast("Daftar IP terblokir diperbarui", "info");
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderBannedTable() {
+            const query = (document.getElementById("searchBannedInput").value || "").toLowerCase();
             const tbody = document.getElementById("bannedIpsTableBody");
 
-            if (list.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-400">Tidak ada IP yang sedang diblokir permanen.</td></tr>';
+            const filtered = bannedIpsCache.filter(item =>
+                item.ip_address.toLowerCase().includes(query) ||
+                item.domain.toLowerCase().includes(query) ||
+                item.reason.toLowerCase().includes(query)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">Tidak ada IP yang sedang diblokir permanen.</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = list.map(item => `
-                <tr class="hover:bg-red-50/40">
-                    <td class="py-3 px-3 font-mono font-bold text-red-600">${item.ip_address}</td>
-                    <td class="py-3 px-3 text-slate-800">${item.domain}</td>
-                    <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">${item.reason}</span></td>
-                    <td class="py-3 px-3 text-slate-500 text-xs">${item.banned_at}</td>
-                    <td class="py-3 px-3 text-right">
-                        <button onclick="unblockIp('${item.ip_address}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold">
+            tbody.innerHTML = filtered.map(item => `
+                <tr class="hover:bg-rose-50/40 transition">
+                    <td class="py-3.5 px-4 font-mono font-bold text-rose-600">${escapeHtml(item.ip_address)}</td>
+                    <td class="py-3.5 px-4 text-slate-800 font-medium">${escapeHtml(item.domain)}</td>
+                    <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">${escapeHtml(item.reason)}</span></td>
+                    <td class="py-3.5 px-4 text-slate-500 text-xs font-mono">${escapeHtml(item.banned_at)}</td>
+                    <td class="py-3.5 px-4 text-right">
+                        <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}')"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-semibold transition shadow-xs">
                             Unblokir
                         </button>
                     </td>
@@ -411,48 +926,167 @@
             `).join("");
         }
 
-        async function unblockIp(ip) {
-            if (!confirm(`Buka blokir permanen untuk IP ${ip}?`)) return;
+        function openManualBanModal(prefillIp = "", prefillDomain = "Semua Domain (Manual)") {
+            document.getElementById("banIpInput").value = prefillIp;
+            document.getElementById("banDomainInput").value = prefillDomain;
+            document.getElementById("banReasonInput").value = "Diblokir Manual oleh Admin";
+            document.getElementById("manualBanModal").classList.remove("hidden");
+        }
+
+        function closeManualBanModal() {
+            document.getElementById("manualBanModal").classList.add("hidden");
+        }
+
+        async function submitManualBan(e) {
+            e.preventDefault();
             const role = localStorage.getItem("role");
-            const res = await fetch(`/admin/api/banned-ips/${encodeURIComponent(ip)}`, {
+            const ip_address = document.getElementById("banIpInput").value.trim();
+            const domain = document.getElementById("banDomainInput").value.trim();
+            const reason = document.getElementById("banReasonInput").value.trim();
+
+            const res = await fetch("/admin/api/banned-ips", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-role": role
+                },
+                body: JSON.stringify({ ip_address, domain, reason })
+            });
+
+            if (res.ok) {
+                closeManualBanModal();
+                showToast(`IP ${ip_address} berhasil diblokir permanen`);
+                await loadBannedIps(false);
+            } else {
+                showToast("Gagal memblokir IP", "error");
+            }
+        }
+
+        function confirmUnblockIp(ip) {
+            openConfirmModal(
+                "Buka Blokir IP Permanen",
+                `Izinkan kembali alamat IP ${ip} untuk mengakses situs yang dilindungi WardenWAF?`,
+                "Ya, Unblokir IP",
+                async () => {
+                    const role = localStorage.getItem("role");
+                    const res = await fetch(`/admin/api/banned-ips/${encodeURIComponent(ip)}`, {
+                        method: "DELETE",
+                        headers: { "x-role": role }
+                    });
+                    if (res.ok) {
+                        showToast(`Blokir untuk IP ${ip} berhasil dibuka`);
+                        await loadBannedIps(false);
+                    }
+                }
+            );
+        }
+
+        // --- ATTACK LOGS MANAGEMENT ---
+        async function loadLogs(notify = false) {
+            try {
+                const res = await fetch("/admin/api/logs");
+                if (!res.ok) return;
+                logsCache = await res.json();
+                renderLogsTable();
+                updateStats();
+                if (notify) showToast("Log serangan diperbarui", "info");
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderLogsTable() {
+            const role = localStorage.getItem("role");
+            const query = (document.getElementById("searchLogsInput").value || "").toLowerCase();
+            const threatFilter = document.getElementById("filterThreatType").value;
+            const tbody = document.getElementById("logsTableBody");
+            const bannedSet = new Set(bannedIpsCache.map(b => b.ip_address));
+
+            const filtered = logsCache.filter(l => {
+                const matchText = l.ip_address.toLowerCase().includes(query) ||
+                                  l.domain.toLowerCase().includes(query) ||
+                                  l.threat_type.toLowerCase().includes(query);
+                const matchThreat = threatFilter === "all" || l.threat_type.toLowerCase().includes(threatFilter.toLowerCase());
+                return matchText && matchThreat;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">Tidak ada log serangan tercatat.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(l => {
+                const isAlreadyBanned = bannedSet.has(l.ip_address);
+                const adminActions = role === "admin"
+                    ? `
+                        <td class="py-3.5 px-4 text-right">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                ${!isAlreadyBanned
+                                    ? `<button onclick="openManualBanModal('${escapeHtml(l.ip_address)}', '${escapeHtml(l.domain)}')" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Blokir IP</button>`
+                                    : `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-400 text-[11px] font-medium">Sudah Diblokir</span>`
+                                }
+                                <button onclick="deleteSingleLog(${Number(l.id)})" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
+                                    Hapus
+                                </button>
+                            </div>
+                        </td>
+                    `
+                    : "";
+
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-3.5 px-4 text-xs text-slate-500 font-mono">${escapeHtml(l.timestamp)}</td>
+                        <td class="py-3.5 px-4 font-mono text-xs font-bold text-slate-800">${escapeHtml(l.ip_address)}</td>
+                        <td class="py-3.5 px-4 text-slate-700 font-medium">${escapeHtml(l.domain)}</td>
+                        <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">${escapeHtml(l.threat_type)}</span></td>
+                        ${adminActions}
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function deleteSingleLog(logId) {
+            const role = localStorage.getItem("role");
+            const res = await fetch(`/admin/api/logs/${logId}`, {
                 method: "DELETE",
                 headers: { "x-role": role }
             });
             if (res.ok) {
-                alert(`IP ${ip} berhasil di-unblokir!`);
-                loadBannedIps();
+                showToast("Baris log serangan dihapus");
+                await loadLogs(false);
+            } else {
+                showToast("Gagal menghapus log serangan", "error");
             }
         }
 
-        async function loadLogs() {
-            const res = await fetch("/admin/api/logs");
-            if (!res.ok) return;
-            const logs = await res.json();
-            const tbody = document.getElementById("logsTableBody");
-
-            if (logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-400">Belum ada serangan tercatat.</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = logs.map(l => `
-                <tr class="hover:bg-slate-50">
-                    <td class="py-3 px-3 text-xs text-slate-500">${l.timestamp}</td>
-                    <td class="py-3 px-3 font-mono text-xs font-semibold text-slate-800">${l.ip_address}</td>
-                    <td class="py-3 px-3 text-slate-700">${l.domain}</td>
-                    <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">${l.threat_type}</span></td>
-                </tr>
-            `).join("");
+        function confirmClearAllLogs() {
+            openConfirmModal(
+                "Bersihkan Seluruh Log Serangan",
+                "Semua riwayat log serangan di database akan dihapus secara permanen. Daftar IP yang sudah diblokir tidak akan terhapus.",
+                "Ya, Bersihkan Semua",
+                async () => {
+                    const role = localStorage.getItem("role");
+                    const res = await fetch("/admin/api/logs", {
+                        method: "DELETE",
+                        headers: { "x-role": role }
+                    });
+                    if (res.ok) {
+                        showToast("Seluruh log serangan telah dibersihkan");
+                        await loadLogs(false);
+                    } else {
+                        showToast("Gagal membersihkan log", "error");
+                    }
+                }
+            );
         }
 
         document.addEventListener("DOMContentLoaded", () => {
             initDashboard();
             setInterval(() => {
                 if (localStorage.getItem("username")) {
-                    loadLogs();
-                    if (localStorage.getItem("role") === "admin") loadBannedIps();
+                    syncAllData(false);
                 }
-            }, 5000);
+            }, 8000);
         });
     </script>
 </body>

@@ -117,6 +117,17 @@ class ClientConfig(BaseModel):
     waf_enabled: bool = True
     rate_limit: int = 20
 
+class ClientUpdateConfig(BaseModel):
+    origin_server: str
+    waf_enabled: bool
+    rate_limit: int
+    status: str
+
+class ManualBanData(BaseModel):
+    ip_address: str
+    domain: Optional[str] = "Semua Domain (Manual)"
+    reason: Optional[str] = "Diblokir Manual oleh Admin"
+
 class AuthData(BaseModel):
     username: str
     password: str
@@ -255,9 +266,9 @@ def get_all_domains(x_role: str = Header(...), x_username: str = Header(...)):
     conn = get_db()
     cursor = conn.cursor()
     if x_role == 'admin':
-        cursor.execute("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients")
+        cursor.execute("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients ORDER BY domain ASC")
     else:
-        cursor.execute(q("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients WHERE owner=?"), (x_username,))
+        cursor.execute(q("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients WHERE owner=? ORDER BY domain ASC"), (x_username,))
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -311,6 +322,31 @@ def add_domain(config: ClientConfig, x_role: str = Header(...), x_username: str 
     conn.close()
     return {"message": "Pengajuan berhasil"}
 
+@app.put("/admin/api/domains/{target_domain}")
+def update_domain(target_domain: str, config: ClientUpdateConfig, x_role: str = Header(...)):
+    if x_role != 'admin':
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat mengedit konfigurasi domain")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(q("SELECT domain FROM clients WHERE domain=?"), (target_domain,))
+    if not cursor.fetchone():
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="Domain tidak ditemukan")
+
+    clean_origin = config.origin_server.strip().rstrip("/")
+    clean_status = config.status if config.status in ("approved", "pending") else "approved"
+    waf_val = bool(config.waf_enabled) if clean_status == "approved" else False
+
+    cursor.execute(
+        q("UPDATE clients SET origin_server=?, waf_enabled=?, rate_limit=?, status=? WHERE domain=?"),
+        (clean_origin, waf_val, max(1, config.rate_limit), clean_status, target_domain)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "success", "message": f"Konfigurasi {target_domain} berhasil diperbarui"}
+
 @app.put("/admin/api/domains/{target_domain}/approve")
 def approve_domain(target_domain: str, x_role: str = Header(...)):
     if x_role != 'admin':
@@ -336,17 +372,51 @@ def delete_domain(target_domain: str, x_role: str = Header(...), x_username: str
     conn.close()
     return {"message": "Domain dihapus"}
 
+# --- ENDPOINT LOG SERANGAN (LIHAT & HAPUS KHUSUS ADMIN) ---
 @app.get("/admin/api/logs")
 def get_attack_logs():
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT timestamp, ip_address, domain, threat_type FROM attack_logs ORDER BY id DESC LIMIT 50")
+    cursor.execute("SELECT id, timestamp, ip_address, domain, threat_type FROM attack_logs ORDER BY id DESC LIMIT 100")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return [{"timestamp": r[0], "ip_address": r[1], "domain": r[2], "threat_type": r[3]} for r in rows]
+    return [
+        {
+            "id": r[0],
+            "timestamp": r[1],
+            "ip_address": r[2],
+            "domain": r[3],
+            "threat_type": r[4]
+        }
+        for r in rows
+    ]
 
-# --- ENDPOINT KHUSUS ADMIN: DAFTAR & UNBLOKIR IP PERMANEN ---
+@app.delete("/admin/api/logs/{log_id}")
+def delete_single_log(log_id: int, x_role: str = Header(...)):
+    if x_role != 'admin':
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat menghapus log serangan")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(q("DELETE FROM attack_logs WHERE id=?"), (log_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "success", "message": "Log serangan berhasil dihapus"}
+
+@app.delete("/admin/api/logs")
+def clear_all_logs(x_role: str = Header(...)):
+    if x_role != 'admin':
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat membersihkan log serangan")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM attack_logs")
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "success", "message": "Seluruh log serangan berhasil dibersihkan"}
+
+# --- ENDPOINT KHUSUS ADMIN: DAFTAR, BLOKIR MANUAL & UNBLOKIR IP PERMANEN ---
 @app.get("/admin/api/banned-ips")
 def get_banned_ips(x_role: str = Header(...)):
     if x_role != 'admin':
@@ -366,6 +436,20 @@ def get_banned_ips(x_role: str = Header(...)):
         }
         for r in rows
     ]
+
+@app.post("/admin/api/banned-ips")
+def manual_ban_ip(data: ManualBanData, x_role: str = Header(...)):
+    if x_role != 'admin':
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat memblokir IP")
+    clean_ip = data.ip_address.strip()
+    if not clean_ip:
+        raise HTTPException(status_code=400, detail="Alamat IP tidak boleh kosong")
+    ban_ip_permanently(
+        clean_ip,
+        (data.domain or "Semua Domain (Manual)").strip(),
+        (data.reason or "Diblokir Manual oleh Admin").strip()
+    )
+    return {"status": "success", "message": f"IP {clean_ip} berhasil diblokir permanen"}
 
 @app.delete("/admin/api/banned-ips/{target_ip:path}")
 def unblock_ip(target_ip: str, x_role: str = Header(...)):
