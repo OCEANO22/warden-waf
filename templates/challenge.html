@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memeriksa keamanan koneksi Anda...</title>
+    <title>WardenWAF — Memeriksa keamanan koneksi Anda...</title>
     <style>
         * {
             box-sizing: border-box;
@@ -29,30 +29,29 @@
             font-size: 22px;
             font-weight: 600;
             margin-bottom: 8px;
-            color: #111827;
+            color: #0f172a;
         }
         .subtitle {
             font-size: 14px;
-            color: #4b5563;
+            color: #475569;
             margin-bottom: 22px;
         }
         .verify-box {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background-color: #fafafa;
-            border: 1px solid #d9d9d9;
-            border-radius: 4px;
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
             padding: 16px 20px;
             min-height: 78px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
         }
         .left-status {
             display: flex;
             align-items: center;
             gap: 16px;
         }
-        /* Animasi Spinner Titik Hijau */
         .dot-spinner {
             position: relative;
             width: 32px;
@@ -63,7 +62,7 @@
             position: absolute;
             width: 5px;
             height: 5px;
-            background: #1f8b4c;
+            background: #059669;
             border-radius: 50%;
             animation: dotFade 1.2s linear infinite;
         }
@@ -85,7 +84,7 @@
             display: none;
             width: 30px;
             height: 30px;
-            background: #1f8b4c;
+            background: #059669;
             color: white;
             border-radius: 50%;
             align-items: center;
@@ -96,8 +95,8 @@
         }
         .status-text {
             font-size: 15px;
-            color: #222222;
-            font-weight: 400;
+            color: #1e293b;
+            font-weight: 500;
         }
         .right-brand {
             display: flex;
@@ -108,29 +107,28 @@
         }
         .brand-logo {
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
+            align-items: center;
+            gap: 6px;
         }
         .brand-name {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 800;
             letter-spacing: 0.08em;
-            color: #111111;
-            margin-top: 2px;
+            color: #0f172a;
         }
         .brand-links {
             font-size: 10px;
-            color: #555555;
-            margin-top: 3px;
+            color: #64748b;
+            margin-top: 4px;
         }
         .brand-links a {
-            color: #555555;
+            color: #64748b;
             text-decoration: underline;
         }
         .footer-note {
             margin-top: 18px;
             font-size: 12px;
-            color: #6b7280;
+            color: #64748b;
         }
     </style>
 </head>
@@ -151,12 +149,13 @@
 
             <div class="right-brand">
                 <div class="brand-logo">
-                    <!-- Ikon Awan Keamanan -->
-                    <svg width="36" height="18" viewBox="0 0 64 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M48.5 28H15C9.5 28 5 23.5 5 18C5 12.9 8.8 8.7 13.8 8.1C16.2 3.3 21.2 0 27 0C34.5 0 40.7 5.6 41.6 12.9C42.5 12.6 43.5 12.5 44.5 12.5C50.3 12.5 55 17.2 55 23C55 25.8 52.1 28 48.5 28Z" fill="#F38020"/>
-                        <path d="M51 28H42C42 22.5 46.5 18 52 18C56.4 18 60 21.6 60 26C60 27.1 59.1 28 58 28H51Z" fill="#FAAD3F"/>
+                    <!-- Ikon Perisai Penjaga WardenWAF -->
+                    <svg width="20" height="22" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 1L2 5.5V12.5C2 18.8 6.3 24.6 12 26C17.7 24.6 22 18.8 22 12.5V5.5L12 1Z" fill="#0F172A"/>
+                        <path d="M12 4.2L5 7.3V12.5C5 17.1 8 21.3 12 22.6C16 21.3 19 17.1 19 12.5V7.3L12 4.2Z" fill="#059669"/>
+                        <path d="M10.5 15.8L7.8 13.1L9.1 11.8L10.5 13.2L14.9 8.8L16.2 10.1L10.5 15.8Z" fill="#FFFFFF"/>
                     </svg>
-                    <span class="brand-name">CLOUDFLARE MINI</span>
+                    <span class="brand-name">WARDENWAF</span>
                 </div>
                 <div class="brand-links">
                     <a href="#privasi" onclick="return false;">Privasi</a> &bull; <a href="#bantuan" onclick="return false;">Bantuan</a>
@@ -165,7 +164,7 @@
         </div>
 
         <div class="footer-note">
-            Performa &amp; keamanan dilindungi oleh Cloudflare Mini WAF Enterprise
+            Performa &amp; keamanan dilindungi oleh WardenWAF Enterprise Security
         </div>
     </div>
 
@@ -175,13 +174,11 @@
             const spinner = document.getElementById("spinner");
             const checkIcon = document.getElementById("checkIcon");
 
-            // Blokir browser otomasi sederhana (headless webdriver)
             if (navigator.webdriver) {
                 statusText.textContent = "Verifikasi gagal (Bot terdeteksi).";
                 return;
             }
 
-            // Simulasi pemeriksaan browser selama 1.5 detik
             await new Promise(resolve => setTimeout(resolve, 1500));
 
             const numA = parseInt("{{ num_a }}", 10);

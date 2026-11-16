@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloudflare Mini - WAF Enterprise Dashboard</title>
+    <title>WardenWAF — Enterprise Security Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen font-sans">
@@ -12,18 +12,21 @@
     <nav class="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-orange-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-                    CF
+                <div class="w-9 h-9 rounded-lg bg-slate-900 text-emerald-400 flex items-center justify-center shadow-sm">
+                    <svg class="w-5 h-5" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 1L2 5.5V12.5C2 18.8 6.3 24.6 12 26C17.7 24.6 22 18.8 22 12.5V5.5L12 1Z" fill="currentColor"/>
+                        <path d="M10.5 16L7.5 13L8.9 11.6L10.5 13.2L15.1 8.6L16.5 10L10.5 16Z" fill="#0F172A"/>
+                    </svg>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg text-slate-900 leading-tight">Cloudflare Mini</h1>
-                    <p class="text-xs text-slate-500">WAF &amp; Reverse Proxy Enterprise</p>
+                    <h1 class="font-bold text-lg text-slate-900 leading-tight">WardenWAF</h1>
+                    <p class="text-xs text-slate-500">Enterprise Web Application Firewall &amp; Reverse Proxy</p>
                 </div>
             </div>
             <div id="userControls" class="hidden flex items-center gap-4">
                 <span class="text-sm text-slate-600">
                     Halo, <strong id="displayUsername" class="text-slate-900"></strong>
-                    <span id="displayRole" class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 uppercase"></span>
+                    <span id="displayRole" class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 uppercase"></span>
                 </span>
                 <button onclick="logout()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
                     Keluar
@@ -37,7 +40,7 @@
         <!-- BAGIAN 1: LOGIN & REGISTER -->
         <div id="authSection" class="max-w-md mx-auto bg-white border border-slate-200 rounded-xl p-6 shadow-sm mt-8">
             <div class="flex border-b border-slate-200 mb-6">
-                <button id="tabLogin" onclick="switchAuthTab('login')" class="w-1/2 pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600">
+                <button id="tabLogin" onclick="switchAuthTab('login')" class="w-1/2 pb-3 text-sm font-bold border-b-2 border-slate-900 text-slate-900">
                     Masuk (Login)
                 </button>
                 <button id="tabRegister" onclick="switchAuthTab('register')" class="w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700">
@@ -49,15 +52,15 @@
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Username</label>
                     <input type="text" id="authUsername" required placeholder="Masukkan username"
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-slate-900">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Password</label>
                     <input type="password" id="authPassword" required placeholder="Masukkan password"
-                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-slate-900">
                 </div>
                 <div id="authMessage" class="hidden text-xs font-medium p-3 rounded-lg"></div>
-                <button type="submit" id="authSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-sm">
+                <button type="submit" id="authSubmitBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-sm">
                     Masuk ke Dashboard
                 </button>
             </form>
@@ -69,26 +72,26 @@
             <!-- FORM PENGAJUAN DOMAIN BARU -->
             <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <span class="text-blue-600">&#10148;</span> Ajukan Perlindungan Domain Baru
+                    <span class="text-emerald-600">&#10148;</span> Ajukan Perlindungan Domain Baru
                 </h2>
                 <form onsubmit="addDomain(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                     <div class="md:col-span-4">
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nama Domain</label>
                         <input type="text" id="domainInput" required placeholder="Contoh: api.klien.com"
-                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-900">
                     </div>
                     <div class="md:col-span-5">
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">IP/URL Server Asli (Origin)</label>
                         <input type="text" id="originInput" placeholder="Contoh: http://192.168.1.5 (Kosongkan = Auto IP)"
-                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-900">
                     </div>
                     <div class="md:col-span-1">
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Limit /10s</label>
                         <input type="number" id="rateLimitInput" value="20" min="1" required
-                            class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-900">
                     </div>
                     <div class="md:col-span-2">
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition shadow-sm">
+                        <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition shadow-sm">
                             Kirim Pengajuan
                         </button>
                     </div>
@@ -197,11 +200,11 @@
             msgBox.classList.add("hidden");
 
             if (mode === "login") {
-                tabLogin.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600";
+                tabLogin.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-slate-900 text-slate-900";
                 tabRegister.className = "w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700";
                 submitBtn.textContent = "Masuk ke Dashboard";
             } else {
-                tabRegister.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600";
+                tabRegister.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-slate-900 text-slate-900";
                 tabLogin.className = "w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700";
                 submitBtn.textContent = "Daftar Akun Baru";
             }

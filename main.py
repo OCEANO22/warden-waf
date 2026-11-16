@@ -16,11 +16,11 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import Optional
 
-app = FastAPI(title="Cloudflare Mini - WAF Enterprise")
+app = FastAPI(title="WardenWAF - Enterprise Security")
 
 DB_FILE = "waf_database.db"
 DATABASE_URL = os.getenv("DATABASE_URL")
-WAF_SECRET = os.getenv("WAF_SECRET", "cloudflare-mini-waf-secret-key-2026")
+WAF_SECRET = os.getenv("WAF_SECRET", "warden-waf-enterprise-secret-2026")
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -197,7 +197,7 @@ async def dashboard_ui(request: Request):
 async def verify_js_challenge(data: ChallengeVerifyData, request: Request):
     client_ip = get_client_ip(request)
     if is_ip_banned(client_ip):
-        raise HTTPException(status_code=403, detail="IP Anda diblokir permanen.")
+        raise HTTPException(status_code=403, detail="IP Anda diblokir permanen oleh WardenWAF.")
 
     try:
         if abs(int(time.time()) - int(data.ts)) > 300:
@@ -213,7 +213,7 @@ async def verify_js_challenge(data: ChallengeVerifyData, request: Request):
 
     resp = JSONResponse(content={"status": "verified"})
     resp.set_cookie(
-        key="cf_mini_clearance",
+        key="warden_waf_clearance",
         value=cookie_token,
         max_age=1800,
         httponly=True,
@@ -423,7 +423,7 @@ async def reverse_proxy(request: Request, path: str):
     conn.close()
     
     if not row:
-        return JSONResponse(status_code=404, content={"error": "Domain tidak terdaftar."})
+        return JSONResponse(status_code=404, content={"error": "Domain tidak terdaftar di WardenWAF."})
     client_config = {"origin": row[0], "waf_enabled": bool(row[1]), "rate_limit": row[2], "status": row[3]}
     
     if client_config["status"] == "pending":
@@ -436,6 +436,7 @@ async def reverse_proxy(request: Request, path: str):
             status_code=403,
             content={
                 "status": "blocked",
+                "firewall": "WardenWAF",
                 "reason": f"IP Anda ({client_ip}) diblokir permanen karena {banned_reason}."
             }
         )
@@ -444,7 +445,7 @@ async def reverse_proxy(request: Request, path: str):
     if client_config["waf_enabled"] and is_malicious(str(request.url)):
         ban_ip_permanently(client_ip, host_header, "SQLi/XSS Injection")
         log_attack(client_ip, host_header, "SQLi/XSS Injection")
-        return JSONResponse(status_code=403, content={"status": "blocked", "reason": "Malicious payload detected - IP Banned Permanently"})
+        return JSONResponse(status_code=403, content={"status": "blocked", "firewall": "WardenWAF", "reason": "Malicious payload detected - IP Banned Permanently"})
 
     # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR PERMANEN
     current_time = time.time()
@@ -453,13 +454,13 @@ async def reverse_proxy(request: Request, path: str):
     if len(REQUEST_LOGS[client_ip]) >= client_config["rate_limit"]:
         ban_ip_permanently(client_ip, host_header, "DDoS / Flood Rate Limit")
         log_attack(client_ip, host_header, "DDoS / Flood Rate Limit")
-        return JSONResponse(status_code=429, content={"status": "blocked", "reason": "Too many requests - IP Banned Permanently"})
+        return JSONResponse(status_code=429, content={"status": "blocked", "firewall": "WardenWAF", "reason": "Too many requests - IP Banned Permanently"})
 
     REQUEST_LOGS[client_ip].append(current_time)
 
     # 4. HALAMAN VERIFIKASI BROWSER (JS CHALLENGE)
     if client_config["waf_enabled"]:
-        clearance_cookie = request.cookies.get("cf_mini_clearance")
+        clearance_cookie = request.cookies.get("warden_waf_clearance")
         user_agent = request.headers.get("user-agent", "unknown")
         if not is_valid_clearance(clearance_cookie, user_agent):
             ts = str(int(time.time()))
@@ -492,7 +493,7 @@ async def reverse_proxy(request: Request, path: str):
             )
             
             custom_headers = dict(proxy_resp.headers)
-            custom_headers["X-Protected-By"] = "Cloudflare Mini - WAF Enterprise"
+            custom_headers["X-Protected-By"] = "WardenWAF - Enterprise Security"
             custom_headers["X-WAF-Status"] = "Active"
             
             return Response(content=await proxy_resp.aread(), status_code=proxy_resp.status_code, headers=custom_headers)
