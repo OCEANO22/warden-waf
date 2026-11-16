@@ -199,7 +199,7 @@ def is_valid_clearance(cookie_val: Optional[str], user_agent: str) -> bool:
     except Exception:
         return False
 
-@app.get("/admin/dashboard", response_class=HTMLResponse)
+@app.get("/panel-warden", response_class=HTMLResponse)
 async def dashboard_ui(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {})
 
