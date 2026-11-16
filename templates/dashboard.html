@@ -1,48 +1,386 @@
-<!-- PANEL DAFTAR IP TERBLOKIR PERMANEN (KHUSUS ADMIN) -->
-<div id="bannedIpsSection" style="display: none; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin-top: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="font-size: 16px; font-weight: 700; color: #111827; margin: 0;">
-            🚫 Daftar IP Terblokir Permanen
-        </h3>
-        <button onclick="loadBannedIps()" style="background: #f3f4f6; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
-            Refresh
-        </button>
-    </div>
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
-            <thead>
-                <tr style="border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-transform: uppercase;">
-                    <th style="padding: 10px 12px;">Alamat IP</th>
-                    <th style="padding: 10px 12px;">Domain Target</th>
-                    <th style="padding: 10px 12px;">Alasan Blokir</th>
-                    <th style="padding: 10px 12px;">Waktu Diblokir</th>
-                    <th style="padding: 10px 12px;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody id="bannedIpsTableBody">
-                <tr>
-                    <td colspan="5" style="padding: 16px; text-align: center; color: #9ca3af;">Memuat data...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare Mini - WAF Enterprise Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans">
 
-<script>
-    function getStoredRole() {
-        return localStorage.getItem("role") || localStorage.getItem("userRole") || sessionStorage.getItem("role") || "";
-    }
+    <!-- NAVBAR -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-orange-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                    CF
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-slate-900 leading-tight">Cloudflare Mini</h1>
+                    <p class="text-xs text-slate-500">WAF &amp; Reverse Proxy Enterprise</p>
+                </div>
+            </div>
+            <div id="userControls" class="hidden flex items-center gap-4">
+                <span class="text-sm text-slate-600">
+                    Halo, <strong id="displayUsername" class="text-slate-900"></strong>
+                    <span id="displayRole" class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 uppercase"></span>
+                </span>
+                <button onclick="logout()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                    Keluar
+                </button>
+            </div>
+        </div>
+    </nav>
 
-    async function loadBannedIps() {
-        const role = getStoredRole();
-        const section = document.getElementById("bannedIpsSection");
-        if (role !== "admin") {
-            if (section) section.style.display = "none";
-            return;
+    <main class="max-w-6xl mx-auto px-4 py-8">
+
+        <!-- BAGIAN 1: LOGIN & REGISTER -->
+        <div id="authSection" class="max-w-md mx-auto bg-white border border-slate-200 rounded-xl p-6 shadow-sm mt-8">
+            <div class="flex border-b border-slate-200 mb-6">
+                <button id="tabLogin" onclick="switchAuthTab('login')" class="w-1/2 pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600">
+                    Masuk (Login)
+                </button>
+                <button id="tabRegister" onclick="switchAuthTab('register')" class="w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700">
+                    Daftar Akun Baru
+                </button>
+            </div>
+
+            <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Username</label>
+                    <input type="text" id="authUsername" required placeholder="Masukkan username"
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Password</label>
+                    <input type="password" id="authPassword" required placeholder="Masukkan password"
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div id="authMessage" class="hidden text-xs font-medium p-3 rounded-lg"></div>
+                <button type="submit" id="authSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-sm">
+                    Masuk ke Dashboard
+                </button>
+            </form>
+        </div>
+
+        <!-- BAGIAN 2: KONTEN UTAMA DASHBOARD -->
+        <div id="dashboardSection" class="hidden space-y-6">
+
+            <!-- FORM PENGAJUAN DOMAIN BARU -->
+            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <span class="text-blue-600">&#10148;</span> Ajukan Perlindungan Domain Baru
+                </h2>
+                <form onsubmit="addDomain(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nama Domain</label>
+                        <input type="text" id="domainInput" required placeholder="Contoh: api.klien.com"
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="md:col-span-5">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">IP/URL Server Asli (Origin)</label>
+                        <input type="text" id="originInput" placeholder="Contoh: http://192.168.1.5 (Kosongkan = Auto IP)"
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Limit /10s</label>
+                        <input type="number" id="rateLimitInput" value="20" min="1" required
+                            class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition shadow-sm">
+                            Kirim Pengajuan
+                        </button>
+                    </div>
+                </form>
+                <p id="userNotice" class="hidden mt-3 text-xs text-amber-600">
+                    &#9432; Domain yang diajukan akan berstatus <strong>Menunggu Persetujuan Admin</strong> dan WAF belum diaktifkan.
+                </p>
+            </div>
+
+            <!-- TABEL DAFTAR KONFIGURASI PROKSI -->
+            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold text-slate-900">Daftar Konfigurasi Proksi</h2>
+                    <button onclick="loadDomains()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium">
+                        Refresh
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                                <th class="py-3 px-3">Domain Client</th>
+                                <th class="py-3 px-3">Origin Target</th>
+                                <th class="py-3 px-3">Pemilik</th>
+                                <th class="py-3 px-3">Status Persetujuan</th>
+                                <th class="py-3 px-3">WAF</th>
+                                <th class="py-3 px-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="domainsTableBody" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="6" class="py-6 text-center text-slate-400">Memuat data domain...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PANEL KHUSUS ADMIN: DAFTAR IP TERBLOKIR PERMANEN -->
+            <div id="bannedIpsSection" class="hidden bg-white border border-red-200 rounded-xl p-6 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold text-red-700">Daftar IP Terblokir Permanen (Admin)</h2>
+                    <button onclick="loadBannedIps()" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-medium">
+                        Refresh
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                                <th class="py-3 px-3">Alamat IP</th>
+                                <th class="py-3 px-3">Domain Target</th>
+                                <th class="py-3 px-3">Alasan Blokir</th>
+                                <th class="py-3 px-3">Waktu Diblokir</th>
+                                <th class="py-3 px-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bannedIpsTableBody" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="5" class="py-6 text-center text-slate-400">Memuat daftar IP terblokir...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TABEL LOG SERANGAN -->
+            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold text-slate-900">Log Serangan Terdeteksi</h2>
+                    <button onclick="loadLogs()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium">
+                        Refresh
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                                <th class="py-3 px-3">Waktu</th>
+                                <th class="py-3 px-3">IP Penyerang</th>
+                                <th class="py-3 px-3">Domain Target</th>
+                                <th class="py-3 px-3">Jenis Ancaman</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="4" class="py-6 text-center text-slate-400">Belum ada serangan tercatat.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        let authMode = "login";
+
+        function switchAuthTab(mode) {
+            authMode = mode;
+            const tabLogin = document.getElementById("tabLogin");
+            const tabRegister = document.getElementById("tabRegister");
+            const submitBtn = document.getElementById("authSubmitBtn");
+            const msgBox = document.getElementById("authMessage");
+            msgBox.classList.add("hidden");
+
+            if (mode === "login") {
+                tabLogin.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600";
+                tabRegister.className = "w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700";
+                submitBtn.textContent = "Masuk ke Dashboard";
+            } else {
+                tabRegister.className = "w-1/2 pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600";
+                tabLogin.className = "w-1/2 pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700";
+                submitBtn.textContent = "Daftar Akun Baru";
+            }
         }
-        if (section) section.style.display = "block";
 
-        try {
+        async function handleAuth(e) {
+            e.preventDefault();
+            const username = document.getElementById("authUsername").value.trim();
+            const password = document.getElementById("authPassword").value.trim();
+            const msgBox = document.getElementById("authMessage");
+            const endpoint = authMode === "login" ? "/api/login" : "/api/register";
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    msgBox.textContent = data.detail || "Terjadi kesalahan.";
+                    msgBox.className = "text-xs font-medium p-3 rounded-lg bg-red-50 text-red-600 border border-red-200";
+                    return;
+                }
+
+                if (authMode === "register") {
+                    msgBox.textContent = "Akun berhasil dibuat! Silakan login.";
+                    msgBox.className = "text-xs font-medium p-3 rounded-lg bg-green-50 text-green-700 border border-green-200";
+                    switchAuthTab("login");
+                    return;
+                }
+
+                localStorage.setItem("username", data.username);
+                localStorage.setItem("role", data.role);
+                initDashboard();
+            } catch (err) {
+                msgBox.textContent = "Gagal terhubung ke server.";
+                msgBox.className = "text-xs font-medium p-3 rounded-lg bg-red-50 text-red-600 border border-red-200";
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("username");
+            localStorage.removeItem("role");
+            location.reload();
+        }
+
+        function initDashboard() {
+            const username = localStorage.getItem("username");
+            const role = localStorage.getItem("role");
+
+            if (!username || !role) {
+                document.getElementById("authSection").classList.remove("hidden");
+                document.getElementById("dashboardSection").classList.add("hidden");
+                document.getElementById("userControls").classList.add("hidden");
+                return;
+            }
+
+            document.getElementById("authSection").classList.add("hidden");
+            document.getElementById("dashboardSection").classList.remove("hidden");
+            document.getElementById("userControls").classList.remove("hidden");
+
+            document.getElementById("displayUsername").textContent = username;
+            document.getElementById("displayRole").textContent = role;
+
+            if (role === "admin") {
+                document.getElementById("bannedIpsSection").classList.remove("hidden");
+                document.getElementById("userNotice").classList.add("hidden");
+                loadBannedIps();
+            } else {
+                document.getElementById("bannedIpsSection").classList.add("hidden");
+                document.getElementById("userNotice").classList.remove("hidden");
+            }
+
+            loadDomains();
+            loadLogs();
+        }
+
+        async function loadDomains() {
+            const username = localStorage.getItem("username");
+            const role = localStorage.getItem("role");
+            if (!username || !role) return;
+
+            const res = await fetch("/admin/api/domains", {
+                headers: { "x-role": role, "x-username": username }
+            });
+            if (!res.ok) return;
+            const domains = await res.json();
+            const tbody = document.getElementById("domainsTableBody");
+
+            if (domains.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-400">Belum ada domain yang didaftarkan.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = domains.map(d => {
+                const isApproved = d.status === "approved";
+                const statusBadge = isApproved
+                    ? '<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700">&#10003; ACC Admin</span>'
+                    : '<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700">Pending</span>';
+
+                const wafBadge = d.waf_enabled
+                    ? '<span class="text-emerald-600 font-semibold text-xs">Aktif</span>'
+                    : '<span class="text-slate-400 font-semibold text-xs">Nonaktif</span>';
+
+                const approveBtn = (role === "admin" && !isApproved)
+                    ? `<button onclick="approveDomain('${d.domain}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs font-semibold mr-1">ACC</button>`
+                    : "";
+
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3 px-3 font-semibold text-slate-900">${d.domain}</td>
+                        <td class="py-3 px-3 text-slate-500 font-mono text-xs">${d.origin_server}</td>
+                        <td class="py-3 px-3"><span class="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-xs font-semibold">${d.owner}</span></td>
+                        <td class="py-3 px-3">${statusBadge}</td>
+                        <td class="py-3 px-3">${wafBadge}</td>
+                        <td class="py-3 px-3 text-right">
+                            ${approveBtn}
+                            <button onclick="deleteDomain('${d.domain}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1 rounded text-xs font-semibold">
+                                Hapus
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function addDomain(e) {
+            e.preventDefault();
+            const username = localStorage.getItem("username");
+            const role = localStorage.getItem("role");
+            const domain = document.getElementById("domainInput").value.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+            const origin_server = document.getElementById("originInput").value.trim().replace(/\/$/, "");
+            const rate_limit = parseInt(document.getElementById("rateLimitInput").value, 10) || 20;
+
+            const res = await fetch("/admin/api/domains", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-role": role,
+                    "x-username": username
+                },
+                body: JSON.stringify({ domain, origin_server, waf_enabled: true, rate_limit })
+            });
+
+            if (res.ok) {
+                document.getElementById("domainInput").value = "";
+                document.getElementById("originInput").value = "";
+                loadDomains();
+            } else {
+                alert("Gagal menambahkan domain.");
+            }
+        }
+
+        async function approveDomain(domain) {
+            const role = localStorage.getItem("role");
+            const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}/approve`, {
+                method: "PUT",
+                headers: { "x-role": role }
+            });
+            if (res.ok) loadDomains();
+        }
+
+        async function deleteDomain(domain) {
+            if (!confirm(`Hapus domain ${domain}?`)) return;
+            const username = localStorage.getItem("username");
+            const role = localStorage.getItem("role");
+            const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}`, {
+                method: "DELETE",
+                headers: { "x-role": role, "x-username": username }
+            });
+            if (res.ok) loadDomains();
+        }
+
+        async function loadBannedIps() {
+            const role = localStorage.getItem("role");
+            if (role !== "admin") return;
+
             const res = await fetch("/admin/api/banned-ips", {
                 headers: { "x-role": role }
             });
@@ -51,46 +389,68 @@
             const tbody = document.getElementById("bannedIpsTableBody");
 
             if (list.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="padding: 16px; text-align: center; color: #6b7280;">Tidak ada IP yang sedang diblokir permanen.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-400">Tidak ada IP yang sedang diblokir permanen.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = list.map(item => `
-                <tr style="border-bottom: 1px solid #f3f4f6;">
-                    <td style="padding: 12px; font-family: monospace; font-weight: 600; color: #dc2626;">${item.ip_address}</td>
-                    <td style="padding: 12px; color: #111827;">${item.domain}</td>
-                    <td style="padding: 12px;"><span style="background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;">${item.reason}</span></td>
-                    <td style="padding: 12px; color: #4b5563;">${item.banned_at}</td>
-                    <td style="padding: 12px;">
-                        <button onclick="unblockIp('${item.ip_address}')" style="background: #16a34a; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                <tr class="hover:bg-red-50/40">
+                    <td class="py-3 px-3 font-mono font-bold text-red-600">${item.ip_address}</td>
+                    <td class="py-3 px-3 text-slate-800">${item.domain}</td>
+                    <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">${item.reason}</span></td>
+                    <td class="py-3 px-3 text-slate-500 text-xs">${item.banned_at}</td>
+                    <td class="py-3 px-3 text-right">
+                        <button onclick="unblockIp('${item.ip_address}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-semibold">
                             Unblokir
                         </button>
                     </td>
                 </tr>
             `).join("");
-        } catch (err) {
-            console.error("Gagal memuat IP terblokir:", err);
         }
-    }
 
-    async function unblockIp(ip) {
-        if (!confirm("Buka blokir permanen untuk IP " + ip + "?")) return;
-        const role = getStoredRole();
-        const res = await fetch("/admin/api/banned-ips/" + encodeURIComponent(ip), {
-            method: "DELETE",
-            headers: { "x-role": role }
+        async function unblockIp(ip) {
+            if (!confirm(`Buka blokir permanen untuk IP ${ip}?`)) return;
+            const role = localStorage.getItem("role");
+            const res = await fetch(`/admin/api/banned-ips/${encodeURIComponent(ip)}`, {
+                method: "DELETE",
+                headers: { "x-role": role }
+            });
+            if (res.ok) {
+                alert(`IP ${ip} berhasil di-unblokir!`);
+                loadBannedIps();
+            }
+        }
+
+        async function loadLogs() {
+            const res = await fetch("/admin/api/logs");
+            if (!res.ok) return;
+            const logs = await res.json();
+            const tbody = document.getElementById("logsTableBody");
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-400">Belum ada serangan tercatat.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logs.map(l => `
+                <tr class="hover:bg-slate-50">
+                    <td class="py-3 px-3 text-xs text-slate-500">${l.timestamp}</td>
+                    <td class="py-3 px-3 font-mono text-xs font-semibold text-slate-800">${l.ip_address}</td>
+                    <td class="py-3 px-3 text-slate-700">${l.domain}</td>
+                    <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">${l.threat_type}</span></td>
+                </tr>
+            `).join("");
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initDashboard();
+            setInterval(() => {
+                if (localStorage.getItem("username")) {
+                    loadLogs();
+                    if (localStorage.getItem("role") === "admin") loadBannedIps();
+                }
+            }, 5000);
         });
-        if (res.ok) {
-            alert("IP " + ip + " berhasil di-unblokir!");
-            loadBannedIps();
-        } else {
-            alert("Gagal membuka blokir IP.");
-        }
-    }
-
-    // Muat otomatis saat halaman dibuka dan perbarui setiap 5 detik
-    document.addEventListener("DOMContentLoaded", () => {
-        loadBannedIps();
-        setInterval(loadBannedIps, 5000);
-    });
-</script>
+    </script>
+</body>
+</html>
