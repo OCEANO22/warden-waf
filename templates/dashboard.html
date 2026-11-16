@@ -11,7 +11,7 @@
         .font-mono { font-family: 'JetBrains Mono', monospace; }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+<body data-username="{{ username }}" data-role="{{ role }}" class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
 
     <!-- TOP HEADER BAR -->
     <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
@@ -35,12 +35,12 @@
                 </div>
             </div>
 
-            <div id="userControls" class="hidden flex items-center gap-3 sm:gap-4">
+            <div class="flex items-center gap-3 sm:gap-4">
                 <div class="text-right hidden sm:block">
-                    <div class="text-xs text-slate-400">Masuk sebagai</div>
+                    <div class="text-xs text-slate-400">Terverifikasi sebagai</div>
                     <div class="text-sm font-semibold text-white flex items-center justify-end gap-1.5">
-                        <span id="displayUsername"></span>
-                        <span id="displayRole" class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500 text-slate-950 uppercase"></span>
+                        <span id="displayUsername">{{ username }}</span>
+                        <span id="displayRole" class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500 text-slate-950 uppercase">{{ role }}</span>
                     </div>
                 </div>
                 <button onclick="syncAllData(true)" title="Muat Ulang Semua Data"
@@ -58,283 +58,145 @@
     </header>
 
     <!-- MAIN CONTENT -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        <!-- AUTHENTICATION VIEW -->
-        <div id="authSection" class="max-w-md mx-auto mt-10">
-            <div class="bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
-                <div class="bg-slate-900 px-6 py-5 text-white">
-                    <h2 class="text-base font-bold">Portal Kendali Keamanan</h2>
-                    <p class="text-xs text-slate-400 mt-0.5">Masuk untuk mengelola perlindungan domain dan lalu lintas proksi.</p>
+        <!-- KPI SUMMARY CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Domain</p>
+                    <p id="statTotalDomains" class="text-2xl font-extrabold text-slate-900 mt-1">0</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Terdaftar di Reverse Proxy</p>
                 </div>
+                <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                </div>
+            </div>
 
-                <div class="p-6">
-                    <div class="grid grid-cols-2 bg-slate-100 p-1 rounded-xl mb-6">
-                        <button id="tabLogin" onclick="switchAuthTab('login')"
-                            class="py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition">
-                            Masuk (Login)
-                        </button>
-                        <button id="tabRegister" onclick="switchAuthTab('register')"
-                            class="py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition">
-                            Daftar Akun
-                        </button>
-                    </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">WAF Terlindungi</p>
+                    <p id="statActiveWaf" class="text-2xl font-extrabold text-emerald-600 mt-1">0</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Status ACC &amp; JS Challenge</p>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+            </div>
 
-                    <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Username</label>
-                            <input type="text" id="authUsername" required placeholder="Contoh: admin"
-                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Password</label>
-                            <input type="password" id="authPassword" required placeholder="••••••••"
-                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900">
-                        </div>
-                        <div id="authMessage" class="hidden text-xs font-medium p-3 rounded-xl"></div>
-                        <button type="submit" id="authSubmitBtn"
-                            class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm">
-                            Masuk ke Dashboard
-                        </button>
-                    </form>
+            <div id="statBannedCard" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">IP Blokir Permanen</p>
+                    <p id="statBannedIps" class="text-2xl font-extrabold text-rose-600 mt-1">0</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Terkunci di Database</p>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Serangan Ditahan</p>
+                    <p id="statTotalLogs" class="text-2xl font-extrabold text-amber-600 mt-1">0</p>
+                    <p class="text-xs text-slate-400 mt-0.5">SQLi, XSS &amp; Flood DDoS</p>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
                 </div>
             </div>
         </div>
 
-        <!-- DASHBOARD VIEW -->
-        <div id="dashboardSection" class="hidden space-y-6">
-
-            <!-- KPI SUMMARY CARDS -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Domain</p>
-                        <p id="statTotalDomains" class="text-2xl font-extrabold text-slate-900 mt-1">0</p>
-                        <p class="text-xs text-slate-400 mt-0.5">Terdaftar di Reverse Proxy</p>
-                    </div>
-                    <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">WAF Terlindungi</p>
-                        <p id="statActiveWaf" class="text-2xl font-extrabold text-emerald-600 mt-1">0</p>
-                        <p class="text-xs text-slate-400 mt-0.5">Status ACC &amp; JS Challenge</p>
-                    </div>
-                    <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                    </div>
-                </div>
-
-                <div id="statBannedCard" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">IP Blokir Permanen</p>
-                        <p id="statBannedIps" class="text-2xl font-extrabold text-rose-600 mt-1">0</p>
-                        <p class="text-xs text-slate-400 mt-0.5">Terkunci di Database</p>
-                    </div>
-                    <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Serangan Ditahan</p>
-                        <p id="statTotalLogs" class="text-2xl font-extrabold text-amber-600 mt-1">0</p>
-                        <p class="text-xs text-slate-400 mt-0.5">SQLi, XSS &amp; Flood DDoS</p>
-                    </div>
-                    <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                </div>
+        <!-- NAVIGATION FILTER TABS -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl p-2 shadow-sm">
+            <div class="flex flex-wrap items-center gap-1.5">
+                <button onclick="setSectionView('all')" id="nav-all"
+                    class="nav-pill px-3.5 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white transition">
+                    Semua Panel
+                </button>
+                <button onclick="setSectionView('domains')" id="nav-domains"
+                    class="nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                    Konfigurasi Domain
+                </button>
+                <button onclick="setSectionView('banned')" id="nav-banned"
+                    class="nav-pill hidden px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                    Blokir IP Permanen
+                </button>
+                <button onclick="setSectionView('logs')" id="nav-logs"
+                    class="nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                    Log Serangan
+                </button>
             </div>
-
-            <!-- NAVIGATION FILTER TABS -->
-            <div class="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl p-2 shadow-sm">
-                <div class="flex flex-wrap items-center gap-1.5">
-                    <button onclick="setSectionView('all')" id="nav-all"
-                        class="nav-pill px-3.5 py-2 rounded-lg text-xs font-bold bg-slate-900 text-white transition">
-                        Semua Panel
-                    </button>
-                    <button onclick="setSectionView('domains')" id="nav-domains"
-                        class="nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
-                        Konfigurasi Domain
-                    </button>
-                    <button onclick="setSectionView('banned')" id="nav-banned"
-                        class="nav-pill hidden px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
-                        Blokir IP Permanen
-                    </button>
-                    <button onclick="setSectionView('logs')" id="nav-logs"
-                        class="nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
-                        Log Serangan
-                    </button>
-                </div>
-                <div class="px-3 text-xs text-slate-400 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span id="lastSyncText">Sinkronisasi otomatis aktif</span>
-                </div>
+            <div class="px-3 text-xs text-slate-400 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span id="lastSyncText">Sinkronisasi otomatis aktif</span>
             </div>
+        </div>
 
-            <!-- SECTION 1: DOMAIN MANAGEMENT -->
-            <div id="panelDomains" class="space-y-6">
-                <!-- FORM TAMBAH DOMAIN -->
-                <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                        <div>
-                            <h2 class="text-base font-bold text-slate-900">Tambah Perlindungan Domain</h2>
-                            <p class="text-xs text-slate-500">Daftarkan domain atau subdomain untuk dilewatkan melalui Reverse Proxy WardenWAF.</p>
-                        </div>
-                        <span id="userNotice" class="hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
-                            Menunggu ACC Admin sebelum WAF aktif
-                        </span>
-                    </div>
-
-                    <form onsubmit="addDomain(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nama Domain</label>
-                            <input type="text" id="domainInput" required placeholder="Contoh: app.domainanda.com"
-                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
-                        </div>
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">URL / IP Server Asli (Origin)</label>
-                            <input type="text" id="originInput" placeholder="Contoh: https://origin-anda.com"
-                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Rate Limit (/10s)</label>
-                            <input type="number" id="rateLimitInput" value="20" min="1" max="1000" required
-                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
-                        </div>
-                        <div class="md:col-span-2">
-                            <button type="submit"
-                                class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-1.5">
-                                <span>+ Daftarkan</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- TABEL KONFIGURASI PROKSI -->
-                <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                    <div class="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-base font-bold text-slate-900">Daftar Konfigurasi Proksi</h2>
-                            <p class="text-xs text-slate-500">Kelola status persetujuan, target server asli, dan batas kuota akses tiap domain.</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <input type="text" id="searchDomainInput" oninput="renderDomainsTable()" placeholder="Cari domain / origin..."
-                                class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
-                            <select id="filterDomainStatus" onchange="renderDomainsTable()"
-                                class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-900">
-                                <option value="all">Semua Status</option>
-                                <option value="approved">ACC Admin</option>
-                                <option value="pending">Pending</option>
-                            </select>
-                            <button onclick="loadDomains(true)"
-                                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">
-                                Refresh
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                                    <th class="py-3.5 px-4">Domain Client</th>
-                                    <th class="py-3.5 px-4">Origin Target</th>
-                                    <th class="py-3.5 px-4">Limit /10s</th>
-                                    <th class="py-3.5 px-4">Pemilik</th>
-                                    <th class="py-3.5 px-4">Status</th>
-                                    <th class="py-3.5 px-4">WAF</th>
-                                    <th class="py-3.5 px-4 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="domainsTableBody" class="divide-y divide-slate-100">
-                                <tr>
-                                    <td colspan="7" class="py-8 text-center text-slate-400 text-xs">Memuat konfigurasi domain...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 2: BANNED IPS (ADMIN ONLY) -->
-            <div id="panelBannedIps" class="hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                <div class="p-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-rose-50/30">
+        <!-- SECTION 1: DOMAIN MANAGEMENT -->
+        <div id="panelDomains" class="space-y-6">
+            <!-- FORM TAMBAH DOMAIN -->
+            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                     <div>
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-base font-bold text-slate-900">Daftar IP Terblokir Permanen</h2>
-                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-100 text-rose-700">Admin Control</span>
-                        </div>
-                        <p class="text-xs text-slate-500 mt-0.5">IP yang terdeteksi menyerang otomatis dikunci permanen hingga di-unblokir oleh admin.</p>
+                        <h2 class="text-base font-bold text-slate-900">Tambah Perlindungan Domain</h2>
+                        <p class="text-xs text-slate-500">Daftarkan domain atau subdomain untuk dilewatkan melalui Reverse Proxy WardenWAF.</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <input type="text" id="searchBannedInput" oninput="renderBannedTable()" placeholder="Cari IP / alasan..."
-                            class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
-                        <button onclick="openManualBanModal()"
-                            class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition shadow-sm">
-                            + Blokir IP Manual
-                        </button>
-                        <button onclick="loadBannedIps(true)"
-                            class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition">
-                            Refresh
+                    <span id="userNotice" class="hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+                        Menunggu ACC Admin sebelum WAF aktif
+                    </span>
+                </div>
+
+                <form onsubmit="addDomain(event)" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nama Domain</label>
+                        <input type="text" id="domainInput" required placeholder="Contoh: wardenwaf.indoneska.com"
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">URL / IP Server Asli (Origin)</label>
+                        <input type="text" id="originInput" placeholder="Contoh: https://relation.n-oceano22.workers.dev"
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Rate Limit (/10s)</label>
+                        <input type="number" id="rateLimitInput" value="20" min="1" max="1000" required
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-slate-900">
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit"
+                            class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-1.5">
+                            <span>+ Daftarkan</span>
                         </button>
                     </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                                <th class="py-3.5 px-4">Alamat IP</th>
-                                <th class="py-3.5 px-4">Domain Target</th>
-                                <th class="py-3.5 px-4">Alasan Pemblokiran</th>
-                                <th class="py-3.5 px-4">Waktu Diblokir</th>
-                                <th class="py-3.5 px-4 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bannedIpsTableBody" class="divide-y divide-slate-100">
-                            <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat daftar IP terblokir...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                </form>
             </div>
 
-            <!-- SECTION 3: ATTACK LOGS -->
-            <div id="panelLogs" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                <div class="p-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <!-- TABEL KONFIGURASI PROKSI -->
+            <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h2 class="text-base font-bold text-slate-900">Log Serangan Terdeteksi</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Rekaman percobaan SQL Injection, XSS, dan DDoS Flood yang diblokir oleh mesin WAF.</p>
+                        <h2 class="text-base font-bold text-slate-900">Daftar Konfigurasi Proksi</h2>
+                        <p class="text-xs text-slate-500">Kelola status persetujuan, target server asli, dan batas kuota akses tiap domain.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <input type="text" id="searchLogsInput" oninput="renderLogsTable()" placeholder="Cari IP / domain..."
+                        <input type="text" id="searchDomainInput" oninput="renderDomainsTable()" placeholder="Cari domain / origin..."
                             class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
-                        <select id="filterThreatType" onchange="renderLogsTable()"
+                        <select id="filterDomainStatus" onchange="renderDomainsTable()"
                             class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-900">
-                            <option value="all">Semua Ancaman</option>
-                            <option value="SQLi">SQLi / XSS</option>
-                            <option value="DDoS">DDoS / Flood</option>
+                            <option value="all">Semua Status</option>
+                            <option value="approved">ACC Admin</option>
+                            <option value="pending">Pending</option>
                         </select>
-                        <button id="clearAllLogsBtn" onclick="confirmClearAllLogs()"
-                            class="hidden px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition">
-                            Bersihkan Semua Log
-                        </button>
-                        <button onclick="loadLogs(true)"
+                        <button onclick="loadDomains(true)"
                             class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">
                             Refresh
                         </button>
@@ -345,23 +207,116 @@
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                                <th class="py-3.5 px-4">Waktu Kejadian</th>
-                                <th class="py-3.5 px-4">IP Penyerang</th>
-                                <th class="py-3.5 px-4">Domain Target</th>
-                                <th class="py-3.5 px-4">Jenis Ancaman</th>
-                                <th id="logsActionHeader" class="hidden py-3.5 px-4 text-right">Aksi Admin</th>
+                                <th class="py-3.5 px-4">Domain Client</th>
+                                <th class="py-3.5 px-4">Origin Target</th>
+                                <th class="py-3.5 px-4">Limit /10s</th>
+                                <th class="py-3.5 px-4">Pemilik</th>
+                                <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4">WAF</th>
+                                <th class="py-3.5 px-4 text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="logsTableBody" class="divide-y divide-slate-100">
+                        <tbody id="domainsTableBody" class="divide-y divide-slate-100">
                             <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat riwayat log serangan...</td>
+                                <td colspan="7" class="py-8 text-center text-slate-400 text-xs">Memuat konfigurasi domain...</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-
         </div>
+
+        <!-- SECTION 2: BANNED IPS (ADMIN ONLY) -->
+        <div id="panelBannedIps" class="hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-rose-50/30">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-slate-900">Daftar IP Terblokir Permanen</h2>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-100 text-rose-700">Admin Control</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">IP yang terdeteksi menyerang otomatis dikunci permanen hingga di-unblokir oleh admin.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="text" id="searchBannedInput" oninput="renderBannedTable()" placeholder="Cari IP / alasan..."
+                        class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
+                    <button onclick="openManualBanModal()"
+                        class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition shadow-sm">
+                        + Blokir IP Manual
+                    </button>
+                    <button onclick="loadBannedIps(true)"
+                        class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            <th class="py-3.5 px-4">Alamat IP</th>
+                            <th class="py-3.5 px-4">Domain Target</th>
+                            <th class="py-3.5 px-4">Alasan Pemblokiran</th>
+                            <th class="py-3.5 px-4">Waktu Diblokir</th>
+                            <th class="py-3.5 px-4 text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bannedIpsTableBody" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat daftar IP terblokir...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SECTION 3: ATTACK LOGS -->
+        <div id="panelLogs" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Log Serangan Terdeteksi</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Rekaman percobaan SQL Injection, XSS, dan DDoS Flood yang diblokir oleh mesin WAF.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="text" id="searchLogsInput" oninput="renderLogsTable()" placeholder="Cari IP / domain..."
+                        class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-slate-900">
+                    <select id="filterThreatType" onchange="renderLogsTable()"
+                        class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-900">
+                        <option value="all">Semua Ancaman</option>
+                        <option value="SQLi">SQLi / XSS</option>
+                        <option value="DDoS">DDoS / Flood</option>
+                    </select>
+                    <button id="clearAllLogsBtn" onclick="confirmClearAllLogs()"
+                        class="hidden px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition">
+                        Bersihkan Semua Log
+                    </button>
+                    <button onclick="loadLogs(true)"
+                        class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            <th class="py-3.5 px-4">Waktu Kejadian</th>
+                            <th class="py-3.5 px-4">IP Penyerang</th>
+                            <th class="py-3.5 px-4">Domain Target</th>
+                            <th class="py-3.5 px-4">Jenis Ancaman</th>
+                            <th id="logsActionHeader" class="hidden py-3.5 px-4 text-right">Aksi Admin</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-slate-400 text-xs">Memuat riwayat log serangan...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </main>
 
     <!-- MODAL: EDIT KONFIGURASI DOMAIN (ADMIN) -->
@@ -379,7 +334,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">URL / IP Server Asli (Origin)</label>
-                    <input type="text" id="editOriginServer" required placeholder="https://server-asli.com"
+                    <input type="text" id="editOriginServer" required placeholder="https://relation.n-oceano22.workers.dev"
                         class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono focus:outline-none focus:border-slate-900">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
@@ -477,7 +432,9 @@
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
-        let authMode = "login";
+        const CURRENT_USER = document.body.dataset.username || "";
+        const CURRENT_ROLE = document.body.dataset.role || "";
+
         let domainsCache = [];
         let bannedIpsCache = [];
         let logsCache = [];
@@ -491,6 +448,14 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        function handleUnauthorized(res) {
+            if (res.status === 401) {
+                window.location.href = "/panel-warden/login";
+                return true;
+            }
+            return false;
         }
 
         function showToast(message, type = "success") {
@@ -529,73 +494,12 @@
             confirmCallback = null;
         }
 
-        // --- AUTHENTICATION ---
-        function switchAuthTab(mode) {
-            authMode = mode;
-            const tabLogin = document.getElementById("tabLogin");
-            const tabRegister = document.getElementById("tabRegister");
-            const submitBtn = document.getElementById("authSubmitBtn");
-            const msgBox = document.getElementById("authMessage");
-            msgBox.classList.add("hidden");
-
-            if (mode === "login") {
-                tabLogin.className = "py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition";
-                tabRegister.className = "py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition";
-                submitBtn.textContent = "Masuk ke Dashboard";
-            } else {
-                tabRegister.className = "py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition";
-                tabLogin.className = "py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition";
-                submitBtn.textContent = "Buat Akun Baru";
-            }
+        async function logout() {
+            await fetch("/api/logout", { method: "POST" });
+            window.location.href = "/panel-warden/login";
         }
 
-        async function handleAuth(e) {
-            e.preventDefault();
-            const username = document.getElementById("authUsername").value.trim();
-            const password = document.getElementById("authPassword").value.trim();
-            const msgBox = document.getElementById("authMessage");
-            const endpoint = authMode === "login" ? "/api/login" : "/api/register";
-
-            try {
-                const res = await fetch(endpoint, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await res.json();
-
-                if (!res.ok) {
-                    msgBox.textContent = data.detail || "Autentikasi gagal.";
-                    msgBox.className = "text-xs font-medium p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200";
-                    return;
-                }
-
-                if (authMode === "register") {
-                    msgBox.textContent = "Akun berhasil didaftarkan. Silakan masuk.";
-                    msgBox.className = "text-xs font-medium p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200";
-                    switchAuthTab("login");
-                    return;
-                }
-
-                localStorage.setItem("username", data.username);
-                localStorage.setItem("role", data.role);
-                showToast(`Selamat datang, ${data.username}`);
-                initDashboard();
-            } catch (err) {
-                msgBox.textContent = "Tidak dapat terhubung ke server.";
-                msgBox.className = "text-xs font-medium p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200";
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem("username");
-            localStorage.removeItem("role");
-            location.reload();
-        }
-
-        // --- SECTION NAVIGATION ---
         function setSectionView(view) {
-            const role = localStorage.getItem("role");
             document.querySelectorAll(".nav-pill").forEach(btn => {
                 btn.className = "nav-pill px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition";
             });
@@ -611,12 +515,12 @@
             if (view === "all") {
                 pDomains.classList.remove("hidden");
                 pLogs.classList.remove("hidden");
-                if (role === "admin") pBanned.classList.remove("hidden");
+                if (CURRENT_ROLE === "admin") pBanned.classList.remove("hidden");
             } else if (view === "domains") {
                 pDomains.classList.remove("hidden");
                 pBanned.classList.add("hidden");
                 pLogs.classList.add("hidden");
-            } else if (view === "banned" && role === "admin") {
+            } else if (view === "banned" && CURRENT_ROLE === "admin") {
                 pDomains.classList.add("hidden");
                 pBanned.classList.remove("hidden");
                 pLogs.classList.add("hidden");
@@ -627,26 +531,8 @@
             }
         }
 
-        // --- INITIALIZE DASHBOARD ---
         async function initDashboard() {
-            const username = localStorage.getItem("username");
-            const role = localStorage.getItem("role");
-
-            if (!username || !role) {
-                document.getElementById("authSection").classList.remove("hidden");
-                document.getElementById("dashboardSection").classList.add("hidden");
-                document.getElementById("userControls").classList.add("hidden");
-                return;
-            }
-
-            document.getElementById("authSection").classList.add("hidden");
-            document.getElementById("dashboardSection").classList.remove("hidden");
-            document.getElementById("userControls").classList.remove("hidden");
-
-            document.getElementById("displayUsername").textContent = username;
-            document.getElementById("displayRole").textContent = role;
-
-            if (role === "admin") {
+            if (CURRENT_ROLE === "admin") {
                 document.getElementById("panelBannedIps").classList.remove("hidden");
                 document.getElementById("nav-banned").classList.remove("hidden");
                 document.getElementById("clearAllLogsBtn").classList.remove("hidden");
@@ -666,14 +552,13 @@
         }
 
         async function syncAllData(notify = false) {
-            const role = localStorage.getItem("role");
             const icon = document.getElementById("globalSyncIcon");
             if (icon) icon.classList.add("animate-spin");
 
             await Promise.all([
                 loadDomains(false),
                 loadLogs(false),
-                role === "admin" ? loadBannedIps(false) : Promise.resolve()
+                CURRENT_ROLE === "admin" ? loadBannedIps(false) : Promise.resolve()
             ]);
 
             updateStats();
@@ -693,15 +578,9 @@
 
         // --- DOMAIN CRUD ---
         async function loadDomains(notify = false) {
-            const username = localStorage.getItem("username");
-            const role = localStorage.getItem("role");
-            if (!username || !role) return;
-
             try {
-                const res = await fetch("/admin/api/domains", {
-                    headers: { "x-role": role, "x-username": username }
-                });
-                if (!res.ok) return;
+                const res = await fetch("/admin/api/domains");
+                if (handleUnauthorized(res) || !res.ok) return;
                 domainsCache = await res.json();
                 renderDomainsTable();
                 updateStats();
@@ -712,7 +591,6 @@
         }
 
         function renderDomainsTable() {
-            const role = localStorage.getItem("role");
             const query = (document.getElementById("searchDomainInput").value || "").toLowerCase();
             const statusFilter = document.getElementById("filterDomainStatus").value;
             const tbody = document.getElementById("domainsTableBody");
@@ -740,11 +618,11 @@
                     ? '<span class="inline-flex items-center gap-1.5 text-emerald-600 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Aktif</span>'
                     : '<span class="inline-flex items-center gap-1.5 text-slate-400 font-semibold text-xs"><span class="w-2 h-2 rounded-full bg-slate-300"></span>Nonaktif</span>';
 
-                const approveBtn = (role === "admin" && !isApproved)
+                const approveBtn = (CURRENT_ROLE === "admin" && !isApproved)
                     ? `<button onclick="approveDomain('${escapeHtml(d.domain)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-xs font-semibold transition">ACC</button>`
                     : "";
 
-                const editBtn = (role === "admin")
+                const editBtn = (CURRENT_ROLE === "admin")
                     ? `<button onclick="openEditDomainModal('${escapeHtml(d.domain)}')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Edit</button>`
                     : "";
 
@@ -772,22 +650,17 @@
 
         async function addDomain(e) {
             e.preventDefault();
-            const username = localStorage.getItem("username");
-            const role = localStorage.getItem("role");
             const domain = document.getElementById("domainInput").value.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
             const origin_server = document.getElementById("originInput").value.trim().replace(/\/$/, "");
             const rate_limit = parseInt(document.getElementById("rateLimitInput").value, 10) || 20;
 
             const res = await fetch("/admin/api/domains", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-role": role,
-                    "x-username": username
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ domain, origin_server, waf_enabled: true, rate_limit })
             });
 
+            if (handleUnauthorized(res)) return;
             if (res.ok) {
                 document.getElementById("domainInput").value = "";
                 document.getElementById("originInput").value = "";
@@ -817,7 +690,6 @@
 
         async function submitEditDomain(e) {
             e.preventDefault();
-            const role = localStorage.getItem("role");
             const domain = document.getElementById("editDomainName").value;
             const origin_server = document.getElementById("editOriginServer").value.trim().replace(/\/$/, "");
             const rate_limit = parseInt(document.getElementById("editRateLimit").value, 10) || 20;
@@ -826,13 +698,11 @@
 
             const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-role": role
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ origin_server, rate_limit, status, waf_enabled })
             });
 
+            if (handleUnauthorized(res)) return;
             if (res.ok) {
                 closeEditDomainModal();
                 showToast(`Konfigurasi ${domain} diperbarui`);
@@ -844,11 +714,10 @@
         }
 
         async function approveDomain(domain) {
-            const role = localStorage.getItem("role");
             const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}/approve`, {
-                method: "PUT",
-                headers: { "x-role": role }
+                method: "PUT"
             });
+            if (handleUnauthorized(res)) return;
             if (res.ok) {
                 showToast(`Domain ${domain} telah di-ACC`);
                 await loadDomains(false);
@@ -861,12 +730,10 @@
                 `Apakah Anda yakin ingin menghapus ${domain} dari WardenWAF? Lalu lintas untuk domain ini tidak akan diteruskan lagi.`,
                 "Hapus Domain",
                 async () => {
-                    const username = localStorage.getItem("username");
-                    const role = localStorage.getItem("role");
                     const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}`, {
-                        method: "DELETE",
-                        headers: { "x-role": role, "x-username": username }
+                        method: "DELETE"
                     });
+                    if (handleUnauthorized(res)) return;
                     if (res.ok) {
                         showToast(`Domain ${domain} dihapus`);
                         await loadDomains(false);
@@ -877,14 +744,11 @@
 
         // --- BANNED IPS MANAGEMENT (ADMIN) ---
         async function loadBannedIps(notify = false) {
-            const role = localStorage.getItem("role");
-            if (role !== "admin") return;
+            if (CURRENT_ROLE !== "admin") return;
 
             try {
-                const res = await fetch("/admin/api/banned-ips", {
-                    headers: { "x-role": role }
-                });
-                if (!res.ok) return;
+                const res = await fetch("/admin/api/banned-ips");
+                if (handleUnauthorized(res) || !res.ok) return;
                 bannedIpsCache = await res.json();
                 renderBannedTable();
                 renderLogsTable();
@@ -939,20 +803,17 @@
 
         async function submitManualBan(e) {
             e.preventDefault();
-            const role = localStorage.getItem("role");
             const ip_address = document.getElementById("banIpInput").value.trim();
             const domain = document.getElementById("banDomainInput").value.trim();
             const reason = document.getElementById("banReasonInput").value.trim();
 
             const res = await fetch("/admin/api/banned-ips", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-role": role
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ip_address, domain, reason })
             });
 
+            if (handleUnauthorized(res)) return;
             if (res.ok) {
                 closeManualBanModal();
                 showToast(`IP ${ip_address} berhasil diblokir permanen`);
@@ -968,11 +829,10 @@
                 `Izinkan kembali alamat IP ${ip} untuk mengakses situs yang dilindungi WardenWAF?`,
                 "Ya, Unblokir IP",
                 async () => {
-                    const role = localStorage.getItem("role");
                     const res = await fetch(`/admin/api/banned-ips/${encodeURIComponent(ip)}`, {
-                        method: "DELETE",
-                        headers: { "x-role": role }
+                        method: "DELETE"
                     });
+                    if (handleUnauthorized(res)) return;
                     if (res.ok) {
                         showToast(`Blokir untuk IP ${ip} berhasil dibuka`);
                         await loadBannedIps(false);
@@ -985,7 +845,7 @@
         async function loadLogs(notify = false) {
             try {
                 const res = await fetch("/admin/api/logs");
-                if (!res.ok) return;
+                if (handleUnauthorized(res) || !res.ok) return;
                 logsCache = await res.json();
                 renderLogsTable();
                 updateStats();
@@ -996,7 +856,6 @@
         }
 
         function renderLogsTable() {
-            const role = localStorage.getItem("role");
             const query = (document.getElementById("searchLogsInput").value || "").toLowerCase();
             const threatFilter = document.getElementById("filterThreatType").value;
             const tbody = document.getElementById("logsTableBody");
@@ -1017,7 +876,7 @@
 
             tbody.innerHTML = filtered.map(l => {
                 const isAlreadyBanned = bannedSet.has(l.ip_address);
-                const adminActions = role === "admin"
+                const adminActions = CURRENT_ROLE === "admin"
                     ? `
                         <td class="py-3.5 px-4 text-right">
                             <div class="inline-flex items-center justify-end gap-1.5">
@@ -1046,11 +905,10 @@
         }
 
         async function deleteSingleLog(logId) {
-            const role = localStorage.getItem("role");
             const res = await fetch(`/admin/api/logs/${logId}`, {
-                method: "DELETE",
-                headers: { "x-role": role }
+                method: "DELETE"
             });
+            if (handleUnauthorized(res)) return;
             if (res.ok) {
                 showToast("Baris log serangan dihapus");
                 await loadLogs(false);
@@ -1065,11 +923,10 @@
                 "Semua riwayat log serangan di database akan dihapus secara permanen. Daftar IP yang sudah diblokir tidak akan terhapus.",
                 "Ya, Bersihkan Semua",
                 async () => {
-                    const role = localStorage.getItem("role");
                     const res = await fetch("/admin/api/logs", {
-                        method: "DELETE",
-                        headers: { "x-role": role }
+                        method: "DELETE"
                     });
+                    if (handleUnauthorized(res)) return;
                     if (res.ok) {
                         showToast("Seluruh log serangan telah dibersihkan");
                         await loadLogs(false);
@@ -1082,11 +939,7 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             initDashboard();
-            setInterval(() => {
-                if (localStorage.getItem("username")) {
-                    syncAllData(false);
-                }
-            }, 8000);
+            setInterval(() => syncAllData(false), 8000);
         });
     </script>
 </body>

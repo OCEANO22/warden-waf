@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifikasi Login — WardenWAF Security Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen flex flex-col justify-between p-4">
+
+    <div class="flex-1 flex items-center justify-center">
+        <div class="w-full max-w-md">
+            <!-- BRAND HEADER -->
+            <div class="flex flex-col items-center text-center mb-6">
+                <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-lg mb-3">
+                    <svg class="w-8 h-8" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 1L2 5.5V12.5C2 18.8 6.3 24.6 12 26C17.7 24.6 22 18.8 22 12.5V5.5L12 1Z" fill="currentColor"/>
+                        <path d="M10.5 16L7.5 13L8.9 11.6L10.5 13.2L15.1 8.6L16.5 10L10.5 16Z" fill="#020617"/>
+                    </svg>
+                </div>
+                <h1 class="text-xl font-extrabold text-white tracking-tight">WardenWAF</h1>
+                <p class="text-xs text-slate-400 mt-1">Verifikasi Identitas Sebelum Mengakses Panel Kendali</p>
+            </div>
+
+            <!-- LOGIN CARD -->
+            <div class="bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-800 overflow-hidden">
+                <div class="bg-slate-900 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Gerbang Autentikasi</span>
+                    <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Terlindungi
+                    </span>
+                </div>
+
+                <div class="p-6">
+                    <div class="grid grid-cols-2 bg-slate-100 p-1 rounded-xl mb-6">
+                        <button type="button" id="tabLogin" onclick="switchAuthTab('login')"
+                            class="py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition">
+                            Masuk (Login)
+                        </button>
+                        <button type="button" id="tabRegister" onclick="switchAuthTab('register')"
+                            class="py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition">
+                            Daftar Akun Baru
+                        </button>
+                    </div>
+
+                    <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Username</label>
+                            <input type="text" id="authUsername" required autocomplete="username" placeholder="Masukkan username Anda"
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-900">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Password</label>
+                            <div class="relative">
+                                <input type="password" id="authPassword" required autocomplete="current-password" placeholder="••••••••"
+                                    class="w-full px-3.5 py-2.5 pr-16 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-900">
+                                <button type="button" onclick="togglePassword()" id="togglePassBtn"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
+                                    Lihat
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="authMessage" class="hidden text-xs font-medium p-3 rounded-xl"></div>
+
+                        <button type="submit" id="authSubmitBtn"
+                            class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm">
+                            Verifikasi &amp; Masuk ke Dashboard
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center text-[11px] text-slate-500 py-4">
+        WardenWAF Enterprise Reverse Proxy &bull; Sesi dilindungi enkripsi HttpOnly
+    </footer>
+
+    <script>
+        // Bersihkan sisa penyimpanan lokal versi lama agar tidak melewati verifikasi
+        localStorage.removeItem("username");
+        localStorage.removeItem("role");
+
+        let authMode = "login";
+
+        function togglePassword() {
+            const input = document.getElementById("authPassword");
+            const btn = document.getElementById("togglePassBtn");
+            if (input.type === "password") {
+                input.type = "text";
+                btn.textContent = "Sembunyi";
+            } else {
+                input.type = "password";
+                btn.textContent = "Lihat";
+            }
+        }
+
+        function switchAuthTab(mode) {
+            authMode = mode;
+            const tabLogin = document.getElementById("tabLogin");
+            const tabRegister = document.getElementById("tabRegister");
+            const submitBtn = document.getElementById("authSubmitBtn");
+            const msgBox = document.getElementById("authMessage");
+            msgBox.classList.add("hidden");
+
+            if (mode === "login") {
+                tabLogin.className = "py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition";
+                tabRegister.className = "py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition";
+                submitBtn.textContent = "Verifikasi & Masuk ke Dashboard";
+            } else {
+                tabRegister.className = "py-2 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition";
+                tabLogin.className = "py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition";
+                submitBtn.textContent = "Buat Akun Baru";
+            }
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            const username = document.getElementById("authUsername").value.trim();
+            const password = document.getElementById("authPassword").value.trim();
+            const msgBox = document.getElementById("authMessage");
+            const submitBtn = document.getElementById("authSubmitBtn");
+            const endpoint = authMode === "login" ? "/api/login" : "/api/register";
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Memverifikasi...";
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    msgBox.textContent = data.detail || "Verifikasi gagal. Periksa kembali username dan password Anda.";
+                    msgBox.className = "text-xs font-medium p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200";
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = authMode === "login" ? "Verifikasi & Masuk ke Dashboard" : "Buat Akun Baru";
+                    return;
+                }
+
+                if (authMode === "register") {
+                    msgBox.textContent = "Akun berhasil dibuat. Silakan masuk menggunakan akun baru Anda.";
+                    msgBox.className = "text-xs font-medium p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200";
+                    submitBtn.disabled = false;
+                    switchAuthTab("login");
+                    return;
+                }
+
+                msgBox.textContent = "Verifikasi berhasil. Mengalihkan ke dashboard...";
+                msgBox.className = "text-xs font-medium p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200";
+                window.location.href = data.redirect || "/panel-warden";
+            } catch (err) {
+                msgBox.textContent = "Gagal terhubung ke server WardenWAF.";
+                msgBox.className = "text-xs font-medium p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200";
+                submitBtn.disabled = false;
+                submitBtn.textContent = authMode === "login" ? "Verifikasi & Masuk ke Dashboard" : "Buat Akun Baru";
+            }
+        }
+    </script>
+</body>
+</html>

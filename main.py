@@ -10,8 +10,8 @@ import socket
 import psycopg2
 from urllib.parse import unquote
 from datetime import datetime
-from fastapi import FastAPI, Request, Response, HTTPException, Header
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import Optional
@@ -139,6 +139,43 @@ class ChallengeVerifyData(BaseModel):
     ans: int
     sig: str
 
+# --- FUNGSI SESI LOGIN PANEL ADMIN (SERVER-SIDE HTTPONLY COOKIE) ---
+def create_admin_session_token(username: str, role: str) -> str:
+    exp_ts = str(int(time.time()) + 1800)  # Sesi aktif 30 menit
+    payload = f"{username}:{role}:{exp_ts}"
+    sig = hmac.new(
+        WAF_SECRET.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    return f"{payload}.{sig}"
+
+def verify_admin_session(request: Request) -> Optional[dict]:
+    token = request.cookies.get("warden_admin_session")
+    if not token or "." not in token:
+        return None
+    try:
+        payload, sig = token.rsplit(".", 1)
+        username, role, exp_ts = payload.split(":", 2)
+        if int(time.time()) > int(exp_ts):
+            return None
+        expected_sig = hmac.new(
+            WAF_SECRET.encode("utf-8"),
+            payload.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected_sig, sig):
+            return None
+        return {"username": username, "role": role}
+    except Exception:
+        return None
+
+def require_session(request: Request) -> dict:
+    session = verify_admin_session(request)
+    if not session:
+        raise HTTPException(status_code=401, detail="Sesi tidak valid atau telah berakhir. Silakan login kembali.")
+    return session
+
 # --- FUNGSI HELPER PEMBLOKIRAN PERMANEN ---
 def is_ip_banned(ip: str) -> Optional[str]:
     conn = get_db()
@@ -199,9 +236,26 @@ def is_valid_clearance(cookie_val: Optional[str], user_agent: str) -> bool:
     except Exception:
         return False
 
+# --- HALAMAN LOGIN & PANEL WARDEN (WAJIB LOGIN DULU) ---
+@app.get("/panel-warden/login", response_class=HTMLResponse)
+async def panel_login_ui(request: Request):
+    if verify_admin_session(request):
+        return RedirectResponse(url="/panel-warden", status_code=302)
+    return templates.TemplateResponse(request, "login.html", {})
+
 @app.get("/panel-warden", response_class=HTMLResponse)
 async def dashboard_ui(request: Request):
-    return templates.TemplateResponse(request, "dashboard.html", {})
+    session = verify_admin_session(request)
+    if not session:
+        return RedirectResponse(url="/panel-warden/login", status_code=302)
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "username": session["username"],
+            "role": session["role"]
+        }
+    )
 
 # --- ENDPOINT VERIFIKASI JS CHALLENGE ---
 @app.post("/__waf_verify")
@@ -232,7 +286,7 @@ async def verify_js_challenge(data: ChallengeVerifyData, request: Request):
     )
     return resp
 
-# --- ENDPOINT AUTENTIKASI ---
+# --- ENDPOINT AUTENTIKASI PANEL ---
 @app.post("/api/login")
 def login(data: AuthData):
     conn = get_db()
@@ -242,33 +296,61 @@ def login(data: AuthData):
     cursor.close()
     conn.close()
     if user:
-        return {"status": "success", "role": user[0], "username": data.username}
+        role = user[0]
+        session_token = create_admin_session_token(data.username, role)
+        resp = JSONResponse(content={
+            "status": "success",
+            "role": role,
+            "username": data.username,
+            "redirect": "/panel-warden"
+        })
+        # Session cookie tanpa max_age: otomatis berakhir saat browser ditutup
+        resp.set_cookie(
+            key="warden_admin_session",
+            value=session_token,
+            httponly=True,
+            samesite="lax"
+        )
+        return resp
     raise HTTPException(status_code=401, detail="Username atau password salah")
 
 @app.post("/api/register")
 def register(data: AuthData):
+    clean_user = data.username.strip()
+    if len(clean_user) < 3 or len(data.password.strip()) < 4:
+        raise HTTPException(status_code=400, detail="Username minimal 3 karakter dan password minimal 4 karakter")
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(q("SELECT username FROM users WHERE username=?"), (data.username,))
+    cursor.execute(q("SELECT username FROM users WHERE username=?"), (clean_user,))
     if cursor.fetchone():
         cursor.close()
         conn.close()
         raise HTTPException(status_code=400, detail="Username sudah dipakai")
-    cursor.execute(q("INSERT INTO users (username, password, role) VALUES (?, ?, ?)"), (data.username, data.password, 'user'))
+    cursor.execute(q("INSERT INTO users (username, password, role) VALUES (?, ?, ?)"), (clean_user, data.password, 'user'))
     conn.commit()
     cursor.close()
     conn.close()
     return {"status": "success", "message": "Akun berhasil dibuat"}
 
+@app.post("/api/logout")
+def logout():
+    resp = JSONResponse(content={"status": "logged_out"})
+    resp.delete_cookie("warden_admin_session")
+    return resp
+
 # --- ENDPOINT API MANAJEMEN DOMAIN ---
 @app.get("/admin/api/domains")
-def get_all_domains(x_role: str = Header(...), x_username: str = Header(...)):
+def get_all_domains(request: Request):
+    session = require_session(request)
     conn = get_db()
     cursor = conn.cursor()
-    if x_role == 'admin':
+    if session["role"] == 'admin':
         cursor.execute("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients ORDER BY domain ASC")
     else:
-        cursor.execute(q("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients WHERE owner=? ORDER BY domain ASC"), (x_username,))
+        cursor.execute(
+            q("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients WHERE owner=? ORDER BY domain ASC"),
+            (session["username"],)
+        )
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -285,7 +367,8 @@ def get_all_domains(x_role: str = Header(...), x_username: str = Header(...)):
     ]
 
 @app.post("/admin/api/domains")
-def add_domain(config: ClientConfig, x_role: str = Header(...), x_username: str = Header(...)):
+def add_domain(config: ClientConfig, request: Request):
+    session = require_session(request)
     conn = get_db()
     cursor = conn.cursor()
     
@@ -297,8 +380,8 @@ def add_domain(config: ClientConfig, x_role: str = Header(...), x_username: str 
         except socket.gaierror:
             origin = "http://127.0.0.1"
     
-    status = 'approved' if x_role == 'admin' else 'pending'
-    waf_status = bool(config.waf_enabled) if x_role == 'admin' else False
+    status = 'approved' if session["role"] == 'admin' else 'pending'
+    waf_status = bool(config.waf_enabled) if session["role"] == 'admin' else False
     
     if USE_POSTGRES:
         cursor.execute(
@@ -310,12 +393,12 @@ def add_domain(config: ClientConfig, x_role: str = Header(...), x_username: str 
                    rate_limit = EXCLUDED.rate_limit,
                    status = EXCLUDED.status,
                    owner = EXCLUDED.owner""",
-            (config.domain, origin, waf_status, config.rate_limit, status, x_username)
+            (config.domain, origin, waf_status, config.rate_limit, status, session["username"])
         )
     else:
         cursor.execute(
             "INSERT OR REPLACE INTO clients VALUES (?, ?, ?, ?, ?, ?)",
-            (config.domain, origin, waf_status, config.rate_limit, status, x_username)
+            (config.domain, origin, waf_status, config.rate_limit, status, session["username"])
         )
     conn.commit()
     cursor.close()
@@ -323,8 +406,9 @@ def add_domain(config: ClientConfig, x_role: str = Header(...), x_username: str 
     return {"message": "Pengajuan berhasil"}
 
 @app.put("/admin/api/domains/{target_domain}")
-def update_domain(target_domain: str, config: ClientUpdateConfig, x_role: str = Header(...)):
-    if x_role != 'admin':
+def update_domain(target_domain: str, config: ClientUpdateConfig, request: Request):
+    session = require_session(request)
+    if session["role"] != 'admin':
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat mengedit konfigurasi domain")
     conn = get_db()
     cursor = conn.cursor()
@@ -348,8 +432,9 @@ def update_domain(target_domain: str, config: ClientUpdateConfig, x_role: str = 
     return {"status": "success", "message": f"Konfigurasi {target_domain} berhasil diperbarui"}
 
 @app.put("/admin/api/domains/{target_domain}/approve")
-def approve_domain(target_domain: str, x_role: str = Header(...)):
-    if x_role != 'admin':
+def approve_domain(target_domain: str, request: Request):
+    session = require_session(request)
+    if session["role"] != 'admin':
         raise HTTPException(status_code=403, detail="Akses ditolak")
     conn = get_db()
     cursor = conn.cursor()
@@ -360,13 +445,14 @@ def approve_domain(target_domain: str, x_role: str = Header(...)):
     return {"message": "Domain disetujui"}
 
 @app.delete("/admin/api/domains/{target_domain}")
-def delete_domain(target_domain: str, x_role: str = Header(...), x_username: str = Header(...)):
+def delete_domain(target_domain: str, request: Request):
+    session = require_session(request)
     conn = get_db()
     cursor = conn.cursor()
-    if x_role == 'admin':
+    if session["role"] == 'admin':
         cursor.execute(q("DELETE FROM clients WHERE domain=?"), (target_domain,))
     else:
-        cursor.execute(q("DELETE FROM clients WHERE domain=? AND owner=?"), (target_domain, x_username))
+        cursor.execute(q("DELETE FROM clients WHERE domain=? AND owner=?"), (target_domain, session["username"]))
     conn.commit()
     cursor.close()
     conn.close()
@@ -374,7 +460,8 @@ def delete_domain(target_domain: str, x_role: str = Header(...), x_username: str
 
 # --- ENDPOINT LOG SERANGAN (LIHAT & HAPUS KHUSUS ADMIN) ---
 @app.get("/admin/api/logs")
-def get_attack_logs():
+def get_attack_logs(request: Request):
+    require_session(request)
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id, timestamp, ip_address, domain, threat_type FROM attack_logs ORDER BY id DESC LIMIT 100")
@@ -393,8 +480,9 @@ def get_attack_logs():
     ]
 
 @app.delete("/admin/api/logs/{log_id}")
-def delete_single_log(log_id: int, x_role: str = Header(...)):
-    if x_role != 'admin':
+def delete_single_log(log_id: int, request: Request):
+    session = require_session(request)
+    if session["role"] != 'admin':
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat menghapus log serangan")
     conn = get_db()
     cursor = conn.cursor()
@@ -405,8 +493,9 @@ def delete_single_log(log_id: int, x_role: str = Header(...)):
     return {"status": "success", "message": "Log serangan berhasil dihapus"}
 
 @app.delete("/admin/api/logs")
-def clear_all_logs(x_role: str = Header(...)):
-    if x_role != 'admin':
+def clear_all_logs(request: Request):
+    session = require_session(request)
+    if session["role"] != 'admin':
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat membersihkan log serangan")
     conn = get_db()
     cursor = conn.cursor()
@@ -418,8 +507,9 @@ def clear_all_logs(x_role: str = Header(...)):
 
 # --- ENDPOINT KHUSUS ADMIN: DAFTAR, BLOKIR MANUAL & UNBLOKIR IP PERMANEN ---
 @app.get("/admin/api/banned-ips")
-def get_banned_ips(x_role: str = Header(...)):
-    if x_role != 'admin':
+def get_banned_ips(request: Request):
+    session = require_session(request)
+    if session["role"] != 'admin':
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat melihat daftar IP terblokir")
     conn = get_db()
     cursor = conn.cursor()
@@ -438,8 +528,9 @@ def get_banned_ips(x_role: str = Header(...)):
     ]
 
 @app.post("/admin/api/banned-ips")
-def manual_ban_ip(data: ManualBanData, x_role: str = Header(...)):
-    if x_role != 'admin':
+def manual_ban_ip(data: ManualBanData, request: Request):
+    session = require_session(request)
+    if session["role"] != 'admin':
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat memblokir IP")
     clean_ip = data.ip_address.strip()
     if not clean_ip:
@@ -452,8 +543,9 @@ def manual_ban_ip(data: ManualBanData, x_role: str = Header(...)):
     return {"status": "success", "message": f"IP {clean_ip} berhasil diblokir permanen"}
 
 @app.delete("/admin/api/banned-ips/{target_ip:path}")
-def unblock_ip(target_ip: str, x_role: str = Header(...)):
-    if x_role != 'admin':
+def unblock_ip(target_ip: str, request: Request):
+    session = require_session(request)
+    if session["role"] != 'admin':
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat membuka blokir IP")
     conn = get_db()
     cursor = conn.cursor()
@@ -494,7 +586,7 @@ def log_attack(ip: str, domain: str, threat: str):
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def reverse_proxy(request: Request, path: str):
-    if str(request.url.path).startswith(("/admin/", "/api/")):
+    if str(request.url.path).startswith(("/admin/", "/api/", "/panel-warden")):
         return JSONResponse(status_code=404, content={"error": "Not Found"})
     client_ip = get_client_ip(request)
     host_header = request.headers.get("host", "").split(":")[0]
