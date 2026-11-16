@@ -1,6 +1,9 @@
 import os
 import time
 import re
+import hmac
+import hashlib
+import secrets
 import httpx
 import sqlite3
 import socket
@@ -16,6 +19,7 @@ app = FastAPI(title="Cloudflare Mini - WAF Enterprise")
 
 DB_FILE = "waf_database.db"
 DATABASE_URL = os.getenv("DATABASE_URL")
+WAF_SECRET = os.getenv("WAF_SECRET", "cloudflare-mini-waf-secret-key-2026")
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -28,7 +32,6 @@ def get_db():
     return sqlite3.connect(DB_FILE)
 
 def q(query: str) -> str:
-    """Menyesuaikan placeholder parameter SQLite (?) ke PostgreSQL (%s)."""
     return query.replace("?", "%s") if USE_POSTGRES else query
 
 # --- 1. SETUP DATABASE ---
@@ -98,9 +101,68 @@ class AuthData(BaseModel):
     username: str
     password: str
 
+class ChallengeVerifyData(BaseModel):
+    ts: str
+    a: int
+    b: int
+    ans: int
+    sig: str
+
+# --- FUNGSI HELPER JS CHALLENGE ---
+def sign_challenge(ts: str, a: int, b: int, ans: int) -> str:
+    payload = f"{ts}:{a}:{b}:{ans}".encode("utf-8")
+    return hmac.new(WAF_SECRET.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+
+def create_clearance_cookie(user_agent: str) -> str:
+    exp_ts = str(int(time.time()) + 1800)  # Berlaku 30 menit
+    payload = f"{user_agent}:{exp_ts}".encode("utf-8")
+    sig = hmac.new(WAF_SECRET.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    return f"{exp_ts}.{sig}"
+
+def is_valid_clearance(cookie_val: Optional[str], user_agent: str) -> bool:
+    if not cookie_val or "." not in cookie_val:
+        return False
+    try:
+        exp_ts, sig = cookie_val.split(".", 1)
+        if int(time.time()) > int(exp_ts):
+            return False
+        expected_sig = hmac.new(
+            WAF_SECRET.encode("utf-8"),
+            f"{user_agent}:{exp_ts}".encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected_sig, sig)
+    except Exception:
+        return False
+
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def dashboard_ui(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {})
+
+# --- ENDPOINT VERIFIKASI JS CHALLENGE ---
+@app.post("/__waf_verify")
+async def verify_js_challenge(data: ChallengeVerifyData, request: Request):
+    try:
+        if abs(int(time.time()) - int(data.ts)) > 300:
+            raise HTTPException(status_code=400, detail="Challenge kedaluwarsa")
+        expected_sig = sign_challenge(data.ts, data.a, data.b, data.ans)
+        if not hmac.compare_digest(expected_sig, data.sig):
+            raise HTTPException(status_code=403, detail="Jawaban verifikasi tidak valid")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Format tidak valid")
+
+    user_agent = request.headers.get("user-agent", "unknown")
+    cookie_token = create_clearance_cookie(user_agent)
+
+    resp = JSONResponse(content={"status": "verified"})
+    resp.set_cookie(
+        key="cf_mini_clearance",
+        value=cookie_token,
+        max_age=1800,
+        httponly=True,
+        samesite="lax"
+    )
+    return resp
 
 # --- ENDPOINT AUTENTIKASI ---
 @app.post("/api/login")
@@ -159,7 +221,6 @@ def add_domain(config: ClientConfig, x_role: str = Header(...), x_username: str 
     conn = get_db()
     cursor = conn.cursor()
     
-    # Otomatisasi pencarian IP via DNS Lookup jika origin_server dikosongkan
     origin = config.origin_server
     if not origin or origin.strip() == "":
         try:
@@ -292,6 +353,28 @@ async def reverse_proxy(request: Request, path: str):
         return JSONResponse(status_code=429, content={"status": "blocked", "reason": "Too many requests"})
 
     REQUEST_LOGS[client_ip].append(current_time)
+
+    # --- TAMPILKAN HALAMAN VERIFIKASI JIKA BELUM ADA COOKIE ---
+    if client_config["waf_enabled"]:
+        clearance_cookie = request.cookies.get("cf_mini_clearance")
+        user_agent = request.headers.get("user-agent", "unknown")
+        if not is_valid_clearance(clearance_cookie, user_agent):
+            ts = str(int(time.time()))
+            num_a = secrets.randbelow(40) + 10
+            num_b = secrets.randbelow(40) + 10
+            sig = sign_challenge(ts, num_a, num_b, num_a + num_b)
+            return templates.TemplateResponse(
+                request,
+                "challenge.html",
+                {
+                    "domain": host_header,
+                    "ts": ts,
+                    "num_a": num_a,
+                    "num_b": num_b,
+                    "sig": sig
+                }
+            )
+
     async with httpx.AsyncClient(base_url=client_config["origin"]) as client:
         url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
         try:
