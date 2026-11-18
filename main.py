@@ -699,7 +699,10 @@ async def reverse_proxy(request: Request, path: str):
                     request.method,
                     url,
                     content=await request.body(),
-                    headers={k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
+                    headers={
+                        k: v for k, v in request.headers.items()
+                        if k.lower() not in ("host", "content-length", "accept-encoding")
+                    }
                 ),
                 stream=True
             )
