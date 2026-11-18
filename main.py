@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import re
 import hmac
@@ -8,7 +9,7 @@ import httpx
 import sqlite3
 import socket
 import psycopg2
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 from datetime import datetime
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
@@ -591,11 +592,14 @@ def log_attack(ip: str, domain: str, threat: str):
 def resolve_proxy_target(request: Request, path: str):
     """
     Menentukan domain target dan path tujuan:
-    1. Jalur instan: /p/<nama_web> atau /p/<nama_web>/sub-halaman
-    2. Cookie sesi (warden_site) untuk memuat aset CSS/JS/gambar dari jalur instan
-    3. Custom domain penuh berdasarkan header Host
+    1. Jalur instan eksplisit: /p/<nama_web> atau /p/<nama_web>/sub-halaman
+    2. Permintaan aset/API sub-path (bukan '/'): cek Referer /p/<nama_web> lalu cookie warden_site
+    3. Akses langsung ke '/' atau custom domain penuh: baca dari header Host
     """
     clean_path = "/" + path.lstrip("/")
+    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
+
+    # 1. Jalur instan /p/<nama_web>
     if clean_path == "/p" or clean_path.startswith("/p/"):
         parts = clean_path.split("/", 3)  # ['', 'p', '<nama_web>', '<sisa_path>']
         if len(parts) >= 3 and parts[2].strip():
@@ -603,12 +607,61 @@ def resolve_proxy_target(request: Request, path: str):
             forward_path = "/" + parts[3] if len(parts) == 4 else "/"
             return site_name, forward_path, site_name
 
-    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
-    cookie_site = request.cookies.get("warden_site")
-    if cookie_site:
-        return cookie_site.strip().lower(), clean_path, None
+    # 2. Aset pendukung (/assets/..., /api/..., gambar, CSS/JS) — bukan akses langsung ke '/'
+    if clean_path != "/":
+        referer = request.headers.get("referer", "")
+        if referer:
+            ref_parsed = urlparse(referer)
+            if ref_parsed.netloc.split(":")[0].lower() == host_header and ref_parsed.path.startswith("/p/"):
+                ref_parts = ref_parsed.path.split("/", 3)
+                if len(ref_parts) >= 3 and ref_parts[2].strip():
+                    return ref_parts[2].strip().lower(), clean_path, None
 
+        cookie_site = request.cookies.get("warden_site")
+        if cookie_site:
+            return cookie_site.strip().lower(), clean_path, None
+
+    # 3. Default: gunakan header Host (mengabaikan cookie jika pengunjung membuka '/' secara langsung)
     return host_header, clean_path, None
+
+def inject_spa_subpath_handler(html_bytes: bytes, site_name: str) -> bytes:
+    """Menyesuaikan router SPA (React/Vue) agar tetap merender '/' sambil menjaga URL /p/<site_name> di browser."""
+    html_text = html_bytes.decode("utf-8", errors="replace")
+    prefix_json = json.dumps(f"/p/{site_name}")
+    prefix_script = f"""<script>
+(function() {{
+  var prefix = {prefix_json};
+  var origPush = history.pushState;
+  var origReplace = history.replaceState;
+  function withPrefix(url) {{
+    if (typeof url === "string" && url.charAt(0) === "/" && url.indexOf(prefix) !== 0) {{
+      return prefix + (url === "/" ? "" : url);
+    }}
+    return url;
+  }}
+  history.pushState = function(state, title, url) {{
+    return origPush.call(history, state, title, withPrefix(url));
+  }};
+  history.replaceState = function(state, title, url) {{
+    return origReplace.call(history, state, title, withPrefix(url));
+  }};
+  if (window.location.pathname === prefix || window.location.pathname.indexOf(prefix + "/") === 0) {{
+    var innerPath = window.location.pathname.slice(prefix.length) || "/";
+    origReplace.call(history, history.state, "", innerPath + window.location.search + window.location.hash);
+    window.addEventListener("load", function() {{
+      var currentInner = window.location.pathname;
+      if (currentInner.indexOf(prefix) !== 0) {{
+        origReplace.call(history, history.state, "", prefix + (currentInner === "/" ? "" : currentInner) + window.location.search + window.location.hash);
+      }}
+    }});
+  }}
+}})();
+</script>"""
+    if re.search(r"<head[^>]*>", html_text, re.IGNORECASE):
+        html_text = re.sub(r"<head[^>]*>", lambda m: m.group(0) + prefix_script, html_text, count=1, flags=re.IGNORECASE)
+    else:
+        html_text = prefix_script + html_text
+    return html_text.encode("utf-8")
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def reverse_proxy(request: Request, path: str):
@@ -626,7 +679,10 @@ async def reverse_proxy(request: Request, path: str):
     conn.close()
 
     if not row:
-        return JSONResponse(status_code=404, content={"error": "Domain tidak terdaftar di WardenWAF."})
+        resp_404 = JSONResponse(status_code=404, content={"error": "Domain tidak terdaftar di WardenWAF."})
+        if request.cookies.get("warden_site") and not new_site_cookie:
+            resp_404.delete_cookie("warden_site", path="/")
+        return resp_404
     client_config = {"origin": row[0], "waf_enabled": bool(row[1]), "rate_limit": row[2], "status": row[3]}
 
     if client_config["status"] == "pending":
@@ -691,21 +747,6 @@ async def reverse_proxy(request: Request, path: str):
                 )
             return challenge_resp
 
-    # 5. SIMPAN COOKIE SITUS & ARAHKAN KE ROOT AGAR ROUTER SPA & ASET TERMUAT UTUH
-    if new_site_cookie:
-        redirect_url = forward_path
-        if request.url.query:
-            redirect_url += f"?{request.url.query}"
-        redir_resp = RedirectResponse(url=redirect_url, status_code=302)
-        redir_resp.set_cookie(
-            key="warden_site",
-            value=new_site_cookie,
-            path="/",
-            httponly=True,
-            samesite="lax"
-        )
-        return redir_resp
-
     async with httpx.AsyncClient(base_url=client_config["origin"]) as client:
         url = httpx.URL(path=forward_path, query=request.url.query.encode("utf-8"))
         try:
@@ -730,8 +771,13 @@ async def reverse_proxy(request: Request, path: str):
             custom_headers["X-Protected-By"] = "WardenWAF - Enterprise Security"
             custom_headers["X-WAF-Status"] = "Active"
 
+            resp_body = await proxy_resp.aread()
+            content_type = proxy_resp.headers.get("content-type", "").lower()
+            if new_site_cookie and "text/html" in content_type:
+                resp_body = inject_spa_subpath_handler(resp_body, new_site_cookie)
+
             final_resp = Response(
-                content=await proxy_resp.aread(),
+                content=resp_body,
                 status_code=proxy_resp.status_code,
                 headers=custom_headers
             )
