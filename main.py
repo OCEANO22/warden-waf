@@ -691,6 +691,21 @@ async def reverse_proxy(request: Request, path: str):
                 )
             return challenge_resp
 
+    # 5. SIMPAN COOKIE SITUS & ARAHKAN KE ROOT AGAR ROUTER SPA & ASET TERMUAT UTUH
+    if new_site_cookie:
+        redirect_url = forward_path
+        if request.url.query:
+            redirect_url += f"?{request.url.query}"
+        redir_resp = RedirectResponse(url=redirect_url, status_code=302)
+        redir_resp.set_cookie(
+            key="warden_site",
+            value=new_site_cookie,
+            path="/",
+            httponly=True,
+            samesite="lax"
+        )
+        return redir_resp
+
     async with httpx.AsyncClient(base_url=client_config["origin"]) as client:
         url = httpx.URL(path=forward_path, query=request.url.query.encode("utf-8"))
         try:
