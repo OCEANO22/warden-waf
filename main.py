@@ -304,7 +304,6 @@ def login(data: AuthData):
             "username": data.username,
             "redirect": "/panel-warden"
         })
-        # Session cookie tanpa max_age: otomatis berakhir saat browser ditutup
         resp.set_cookie(
             key="warden_admin_session",
             value=session_token,
@@ -371,18 +370,21 @@ def add_domain(config: ClientConfig, request: Request):
     session = require_session(request)
     conn = get_db()
     cursor = conn.cursor()
-    
-    origin = config.origin_server
-    if not origin or origin.strip() == "":
+
+    clean_domain = config.domain.strip().lower()
+    origin = (config.origin_server or "").strip().rstrip("/")
+    if not origin:
         try:
-            ip_address = socket.gethostbyname(config.domain)
+            ip_address = socket.gethostbyname(clean_domain)
             origin = f"http://{ip_address}"
         except socket.gaierror:
             origin = "http://127.0.0.1"
-    
+    elif not origin.startswith(("http://", "https://")):
+        origin = f"https://{origin}"
+
     status = 'approved' if session["role"] == 'admin' else 'pending'
     waf_status = bool(config.waf_enabled) if session["role"] == 'admin' else False
-    
+
     if USE_POSTGRES:
         cursor.execute(
             """INSERT INTO clients (domain, origin_server, waf_enabled, rate_limit, status, owner)
@@ -393,12 +395,12 @@ def add_domain(config: ClientConfig, request: Request):
                    rate_limit = EXCLUDED.rate_limit,
                    status = EXCLUDED.status,
                    owner = EXCLUDED.owner""",
-            (config.domain, origin, waf_status, config.rate_limit, status, session["username"])
+            (clean_domain, origin, waf_status, config.rate_limit, status, session["username"])
         )
     else:
         cursor.execute(
             "INSERT OR REPLACE INTO clients VALUES (?, ?, ?, ?, ?, ?)",
-            (config.domain, origin, waf_status, config.rate_limit, status, session["username"])
+            (clean_domain, origin, waf_status, config.rate_limit, status, session["username"])
         )
     conn.commit()
     cursor.close()
@@ -419,6 +421,8 @@ def update_domain(target_domain: str, config: ClientUpdateConfig, request: Reque
         raise HTTPException(status_code=404, detail="Domain tidak ditemukan")
 
     clean_origin = config.origin_server.strip().rstrip("/")
+    if clean_origin and not clean_origin.startswith(("http://", "https://")):
+        clean_origin = f"https://{clean_origin}"
     clean_status = config.status if config.status in ("approved", "pending") else "approved"
     waf_val = bool(config.waf_enabled) if clean_status == "approved" else False
 
@@ -584,24 +588,47 @@ def log_attack(ip: str, domain: str, threat: str):
     cursor.close()
     conn.close()
 
+def resolve_proxy_target(request: Request, path: str):
+    """
+    Menentukan domain target dan path tujuan:
+    1. Jalur instan: /p/<nama_web> atau /p/<nama_web>/sub-halaman
+    2. Cookie sesi (warden_site) untuk memuat aset CSS/JS/gambar dari jalur instan
+    3. Custom domain penuh berdasarkan header Host
+    """
+    clean_path = "/" + path.lstrip("/")
+    if clean_path == "/p" or clean_path.startswith("/p/"):
+        parts = clean_path.split("/", 3)  # ['', 'p', '<nama_web>', '<sisa_path>']
+        if len(parts) >= 3 and parts[2].strip():
+            site_name = parts[2].strip().lower()
+            forward_path = "/" + parts[3] if len(parts) == 4 else "/"
+            return site_name, forward_path, site_name
+
+    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
+    cookie_site = request.cookies.get("warden_site")
+    if cookie_site:
+        return cookie_site.strip().lower(), clean_path, None
+
+    return host_header, clean_path, None
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def reverse_proxy(request: Request, path: str):
     if str(request.url.path).startswith(("/admin/", "/api/", "/panel-warden")):
         return JSONResponse(status_code=404, content={"error": "Not Found"})
+
     client_ip = get_client_ip(request)
-    host_header = request.headers.get("host", "").split(":")[0]
-    
+    target_domain, forward_path, new_site_cookie = resolve_proxy_target(request, path)
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(q("SELECT origin_server, waf_enabled, rate_limit, status FROM clients WHERE domain=?"), (host_header,))
+    cursor.execute(q("SELECT origin_server, waf_enabled, rate_limit, status FROM clients WHERE domain=?"), (target_domain,))
     row = cursor.fetchone()
     cursor.close()
     conn.close()
-    
+
     if not row:
         return JSONResponse(status_code=404, content={"error": "Domain tidak terdaftar di WardenWAF."})
     client_config = {"origin": row[0], "waf_enabled": bool(row[1]), "rate_limit": row[2], "status": row[3]}
-    
+
     if client_config["status"] == "pending":
         return JSONResponse(status_code=403, content={"error": "Domain ini sedang menunggu persetujuan Admin."})
 
@@ -619,8 +646,8 @@ async def reverse_proxy(request: Request, path: str):
 
     # 2. DETEKSI SERANGAN SQL INJECTION / XSS -> BLOKIR PERMANEN
     if client_config["waf_enabled"] and is_malicious(str(request.url)):
-        ban_ip_permanently(client_ip, host_header, "SQLi/XSS Injection")
-        log_attack(client_ip, host_header, "SQLi/XSS Injection")
+        ban_ip_permanently(client_ip, target_domain, "SQLi/XSS Injection")
+        log_attack(client_ip, target_domain, "SQLi/XSS Injection")
         return JSONResponse(status_code=403, content={"status": "blocked", "firewall": "WardenWAF", "reason": "Malicious payload detected - IP Banned Permanently"})
 
     # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR PERMANEN
@@ -628,8 +655,8 @@ async def reverse_proxy(request: Request, path: str):
     REQUEST_LOGS.setdefault(client_ip, [])
     REQUEST_LOGS[client_ip] = [t for t in REQUEST_LOGS[client_ip] if current_time - t < TIME_WINDOW]
     if len(REQUEST_LOGS[client_ip]) >= client_config["rate_limit"]:
-        ban_ip_permanently(client_ip, host_header, "DDoS / Flood Rate Limit")
-        log_attack(client_ip, host_header, "DDoS / Flood Rate Limit")
+        ban_ip_permanently(client_ip, target_domain, "DDoS / Flood Rate Limit")
+        log_attack(client_ip, target_domain, "DDoS / Flood Rate Limit")
         return JSONResponse(status_code=429, content={"status": "blocked", "firewall": "WardenWAF", "reason": "Too many requests - IP Banned Permanently"})
 
     REQUEST_LOGS[client_ip].append(current_time)
@@ -643,35 +670,61 @@ async def reverse_proxy(request: Request, path: str):
             num_a = secrets.randbelow(40) + 10
             num_b = secrets.randbelow(40) + 10
             sig = sign_challenge(ts, num_a, num_b, num_a + num_b)
-            return templates.TemplateResponse(
+            challenge_resp = templates.TemplateResponse(
                 request,
                 "challenge.html",
                 {
-                    "domain": host_header,
+                    "domain": target_domain,
                     "ts": ts,
                     "num_a": num_a,
                     "num_b": num_b,
                     "sig": sig
                 }
             )
+            if new_site_cookie:
+                challenge_resp.set_cookie(
+                    key="warden_site",
+                    value=new_site_cookie,
+                    path="/",
+                    httponly=True,
+                    samesite="lax"
+                )
+            return challenge_resp
 
     async with httpx.AsyncClient(base_url=client_config["origin"]) as client:
-        url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
+        url = httpx.URL(path=forward_path, query=request.url.query.encode("utf-8"))
         try:
             proxy_resp = await client.send(
                 client.build_request(
                     request.method,
                     url,
                     content=await request.body(),
-                    headers={k: v for k, v in request.headers.items() if k.lower() != "host"}
+                    headers={k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
                 ),
                 stream=True
             )
-            
-            custom_headers = dict(proxy_resp.headers)
+
+            excluded_resp_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+            custom_headers = {
+                k: v for k, v in proxy_resp.headers.items()
+                if k.lower() not in excluded_resp_headers
+            }
             custom_headers["X-Protected-By"] = "WardenWAF - Enterprise Security"
             custom_headers["X-WAF-Status"] = "Active"
-            
-            return Response(content=await proxy_resp.aread(), status_code=proxy_resp.status_code, headers=custom_headers)
+
+            final_resp = Response(
+                content=await proxy_resp.aread(),
+                status_code=proxy_resp.status_code,
+                headers=custom_headers
+            )
+            if new_site_cookie:
+                final_resp.set_cookie(
+                    key="warden_site",
+                    value=new_site_cookie,
+                    path="/",
+                    httponly=True,
+                    samesite="lax"
+                )
+            return final_resp
         except httpx.RequestError:
             return JSONResponse(status_code=502, content={"error": "Bad Gateway"})
