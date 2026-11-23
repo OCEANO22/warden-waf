@@ -105,7 +105,7 @@
             </button>
 
             <div id="sidebarSecurityGroup" class="hidden pt-4 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Network Defense
+                Network Defense &amp; Access
             </div>
 
             <button onclick="switchView('banned')" id="nav-banned"
@@ -117,6 +117,17 @@
                     <span>Blokir IP Permanen</span>
                 </span>
                 <span id="badgeBannedCount" class="px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">0</span>
+            </button>
+
+            <button onclick="switchView('users')" id="nav-users"
+                class="side-nav hidden w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition">
+                <span class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>User Terdaftar</span>
+                </span>
+                <span id="badgeUsersCount" class="px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">0</span>
             </button>
         </nav>
 
@@ -214,7 +225,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                             </svg>
                             <input type="text" id="heroSearchInput" oninput="handleHeroSearch()"
-                                placeholder="Cari domain proksi, alamat IP penyerang, atau jenis ancaman..."
+                                placeholder="Cari domain proksi, alamat IP penyerang, jenis ancaman, atau user..."
                                 class="w-full bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none">
                             <div class="hidden sm:flex items-center gap-1 ml-2 shrink-0">
                                 <kbd class="px-1.5 py-0.5 text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-700 rounded">Ctrl</kbd>
@@ -352,6 +363,20 @@
                     <div id="overviewLogsList" class="divide-y divide-slate-800/80 border-t border-slate-800/80"></div>
                 </section>
             </div>
+
+            <!-- ADMIN ONLY: REGISTERED USERS SUMMARY PANEL ON OVERVIEW -->
+            <section id="overviewUsersSection" class="hidden rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <button onclick="switchView('users')" class="inline-flex items-center gap-2 text-sm font-bold text-white hover:text-emerald-400 transition">
+                        <span>User Terdaftar</span>
+                        <span id="overviewUsersCount" class="px-2 py-0.5 text-xs font-mono font-semibold rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">0</span>
+                        <span class="text-slate-500">&rsaquo;</span>
+                    </button>
+                    <button onclick="switchView('users')" class="text-xs text-slate-400 hover:text-emerald-400 transition">Kelola semua user &rarr;</button>
+                </div>
+
+                <div id="overviewUsersGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+            </section>
         </main>
 
         <!-- VIEW 2: DOMAINS MANAGEMENT -->
@@ -514,6 +539,54 @@
             </div>
         </section>
 
+        <!-- VIEW 5: REGISTERED USERS MANAGEMENT (ADMIN ONLY) -->
+        <section id="view-users" class="hidden flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-extrabold text-white">Manajemen User Terdaftar</h1>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">Admin</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-0.5">Daftar akun pengguna yang terdaftar pada panel WardenWAF beserta jumlah website yang dikelola.</p>
+                </div>
+                <button onclick="loadUsers(true)"
+                    class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-xs font-medium transition">
+                    Refresh User
+                </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="text" id="searchUsersInput" oninput="renderUsersTable()" placeholder="Cari username..."
+                    class="w-full sm:w-72 px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                <select id="filterUserRole" onchange="renderUsersTable()"
+                    class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:border-emerald-500">
+                    <option value="all">Role: Semua</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                </select>
+            </div>
+
+            <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/80 backdrop-blur-md">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="py-3.5 px-4">Username</th>
+                                <th class="py-3.5 px-4">Role</th>
+                                <th class="py-3.5 px-4">Website Terdaftar</th>
+                                <th class="py-3.5 px-4 text-right">Aksi Admin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody" class="divide-y divide-slate-800/80">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center text-slate-500 text-xs">Memuat daftar user...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
     </div>
 
     <!-- MODAL: TAMBAH DOMAIN BARU -->
@@ -525,9 +598,10 @@
             </div>
             <form onsubmit="addDomain(event)" class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Domain / Subdomain</label>
-                    <input type="text" id="domainInput" required placeholder="Contoh: wardenwaf.indoneska.com"
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Web / Custom Domain</label>
+                    <input type="text" id="domainInput" required placeholder="Contoh: prhumanika atau tokoku.com"
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                    <p class="text-[11px] text-slate-500 mt-1">Ketik nama singkat untuk link instan (<span class="font-mono text-emerald-400">/p/nama</span>) atau isi domain pribadi Anda.</p>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">URL / IP Server Asli (Origin Target)</label>
@@ -673,6 +747,7 @@
         let domainsCache = [];
         let bannedIpsCache = [];
         let logsCache = [];
+        let usersCache = [];
         let confirmCallback = null;
 
         function escapeHtml(str) {
@@ -756,14 +831,15 @@
         }
 
         function switchView(viewName) {
-            if (viewName === "banned" && CURRENT_ROLE !== "admin") return;
+            if ((viewName === "banned" || viewName === "users") && CURRENT_ROLE !== "admin") return;
 
-            const views = ["overview", "domains", "logs", "banned"];
+            const views = ["overview", "domains", "logs", "banned", "users"];
             const labels = {
                 overview: "Beranda WAF",
                 domains: "Domains",
                 logs: "Observability & Logs",
-                banned: "Blokir IP Permanen"
+                banned: "Blokir IP Permanen",
+                users: "Manajemen User"
             };
 
             views.forEach(v => {
@@ -810,6 +886,19 @@
             });
 
             if (CURRENT_ROLE === "admin") {
+                usersCache.filter(u => u.username.toLowerCase().includes(q) || u.role.toLowerCase().includes(q)).slice(0, 3).forEach(u => {
+                    results.push({
+                        category: "User",
+                        title: u.username,
+                        subtitle: `Role: ${u.role.toUpperCase()} • ${u.total_domains} website`,
+                        action: () => {
+                            document.getElementById("searchUsersInput").value = u.username;
+                            renderUsersTable();
+                            switchView("users");
+                        }
+                    });
+                });
+
                 bannedIpsCache.filter(b => b.ip_address.toLowerCase().includes(q) || b.reason.toLowerCase().includes(q)).slice(0, 3).forEach(b => {
                     results.push({
                         category: "Blocked IP",
@@ -865,17 +954,21 @@
             if (CURRENT_ROLE === "admin") {
                 document.getElementById("sidebarSecurityGroup").classList.remove("hidden");
                 document.getElementById("nav-banned").classList.remove("hidden");
+                document.getElementById("nav-users").classList.remove("hidden");
                 document.getElementById("clearAllLogsBtn").classList.remove("hidden");
                 document.getElementById("logsActionHeader").classList.remove("hidden");
                 document.getElementById("overviewBannedCol").classList.remove("hidden");
+                document.getElementById("overviewUsersSection").classList.remove("hidden");
                 document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-3 gap-6";
                 document.getElementById("userNoticeBanner").classList.add("hidden");
             } else {
                 document.getElementById("sidebarSecurityGroup").classList.add("hidden");
                 document.getElementById("nav-banned").classList.add("hidden");
+                document.getElementById("nav-users").classList.add("hidden");
                 document.getElementById("clearAllLogsBtn").classList.add("hidden");
                 document.getElementById("logsActionHeader").classList.add("hidden");
                 document.getElementById("overviewBannedCol").classList.add("hidden");
+                document.getElementById("overviewUsersSection").classList.add("hidden");
                 document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-2 gap-6";
                 document.getElementById("userNoticeBanner").classList.remove("hidden");
             }
@@ -890,7 +983,8 @@
             await Promise.all([
                 loadDomains(false),
                 loadLogs(false),
-                CURRENT_ROLE === "admin" ? loadBannedIps(false) : Promise.resolve()
+                CURRENT_ROLE === "admin" ? loadBannedIps(false) : Promise.resolve(),
+                CURRENT_ROLE === "admin" ? loadUsers(false) : Promise.resolve()
             ]);
 
             renderOverviewLists();
@@ -907,6 +1001,8 @@
             document.getElementById("overviewLogsCount").textContent = logsCache.length;
             document.getElementById("badgeBannedCount").textContent = bannedIpsCache.length;
             document.getElementById("overviewBannedCount").textContent = bannedIpsCache.length;
+            document.getElementById("badgeUsersCount").textContent = usersCache.length;
+            document.getElementById("overviewUsersCount").textContent = usersCache.length;
 
             const activeWaf = domainsCache.filter(d => d.status === "approved" && d.waf_enabled).length;
             document.getElementById("statActiveWafText").textContent = `${activeWaf} dari ${domainsCache.length} domain terlindungi`;
@@ -963,6 +1059,107 @@
                     </button>
                 `).join("");
             }
+
+            // Overview Registered Users Grid (Admin Only)
+            const usersGrid = document.getElementById("overviewUsersGrid");
+            if (usersGrid && CURRENT_ROLE === "admin") {
+                if (usersCache.length === 0) {
+                    usersGrid.innerHTML = '<div class="text-xs text-slate-500 col-span-full">Belum ada user terdaftar.</div>';
+                } else {
+                    usersGrid.innerHTML = usersCache.slice(0, 8).map(u => {
+                        const isAdm = u.role === "admin";
+                        return `
+                            <button onclick="switchView('users')" type="button"
+                                class="p-3.5 rounded-xl bg-slate-950/90 hover:bg-slate-800/70 border border-slate-800 hover:border-sky-500/40 text-left transition flex items-center justify-between">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-xs font-bold text-white truncate">${escapeHtml(u.username)}</span>
+                                        <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${isAdm ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-sky-500/15 text-sky-300 border border-sky-500/30"}">${escapeHtml(u.role)}</span>
+                                    </div>
+                                    <div class="text-[11px] text-slate-400 mt-1 font-mono">${Number(u.total_domains)} website</div>
+                                </div>
+                                <span class="text-slate-500 text-xs ml-2">&rsaquo;</span>
+                            </button>
+                        `;
+                    }).join("");
+                }
+            }
+        }
+
+        // --- USERS MANAGEMENT (ADMIN) ---
+        async function loadUsers(notify = false) {
+            if (CURRENT_ROLE !== "admin") return;
+
+            try {
+                const res = await fetch("/admin/api/users");
+                if (handleUnauthorized(res) || !res.ok) return;
+                usersCache = await res.json();
+                renderUsersTable();
+                renderOverviewLists();
+                if (notify) showToast("Daftar user terdaftar diperbarui", "info");
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById("usersTableBody");
+            if (!tbody) return;
+
+            const query = (document.getElementById("searchUsersInput").value || "").toLowerCase();
+            const roleFilter = document.getElementById("filterUserRole").value;
+
+            const filtered = usersCache.filter(u => {
+                const matchText = u.username.toLowerCase().includes(query);
+                const matchRole = roleFilter === "all" || u.role === roleFilter;
+                return matchText && matchRole;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="py-10 text-center text-slate-500 text-xs">Tidak ada user yang sesuai.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(u => {
+                const isProtected = u.role === "admin" || u.username === CURRENT_USER;
+                const roleBadge = u.role === "admin"
+                    ? '<span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold uppercase rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Admin</span>'
+                    : '<span class="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold uppercase rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">User</span>';
+
+                const actionCell = isProtected
+                    ? '<span class="text-xs text-slate-500 font-medium">Akun Utama</span>'
+                    : `<button onclick="confirmDeleteUser('${escapeHtml(u.username)}')" class="bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Hapus User</button>`;
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-3.5 px-4 font-bold text-white">${escapeHtml(u.username)}</td>
+                        <td class="py-3.5 px-4">${roleBadge}</td>
+                        <td class="py-3.5 px-4 font-mono text-xs text-slate-300">${Number(u.total_domains)} website</td>
+                        <td class="py-3.5 px-4 text-right">${actionCell}</td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        function confirmDeleteUser(username) {
+            openConfirmModal(
+                "Hapus Akun User",
+                `Apakah Anda yakin ingin menghapus akun "${username}" beserta seluruh website yang didaftarkannya dari WardenWAF?`,
+                "Hapus User",
+                async () => {
+                    const res = await fetch(`/admin/api/users/${encodeURIComponent(username)}`, {
+                        method: "DELETE"
+                    });
+                    if (handleUnauthorized(res)) return;
+                    if (res.ok) {
+                        showToast(`User ${username} berhasil dihapus`);
+                        await syncAllData(false);
+                    } else {
+                        const err = await res.json().catch(() => ({}));
+                        showToast(err.detail || "Gagal menghapus user", "error");
+                    }
+                }
+            );
         }
 
         // --- DOMAIN CRUD ---
@@ -1064,7 +1261,7 @@
                 document.getElementById("originInput").value = "";
                 closeAddDomainModal();
                 showToast(`Domain ${domain} berhasil didaftarkan`);
-                await loadDomains(false);
+                await syncAllData(false);
             } else {
                 showToast("Gagal mendaftarkan domain", "error");
             }
@@ -1135,7 +1332,7 @@
                     if (handleUnauthorized(res)) return;
                     if (res.ok) {
                         showToast(`Domain ${domain} berhasil dihapus`);
-                        await loadDomains(false);
+                        await syncAllData(false);
                     } else {
                         const err = await res.json().catch(() => ({}));
                         showToast(err.detail || "Gagal menghapus domain dari database", "error");

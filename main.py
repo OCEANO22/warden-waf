@@ -338,6 +338,49 @@ def logout():
     resp.delete_cookie("warden_admin_session")
     return resp
 
+# --- ENDPOINT KHUSUS ADMIN: DAFTAR & HAPUS USER TERDAFTAR ---
+@app.get("/admin/api/users")
+def get_registered_users(request: Request):
+    session = require_session(request)
+    if session["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat melihat daftar user")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT u.username, u.role, COUNT(c.domain) AS total_domains
+        FROM users u
+        LEFT JOIN clients c ON u.username = c.owner
+        GROUP BY u.username, u.role
+        ORDER BY u.role ASC, u.username ASC
+    """)
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return [
+        {
+            "username": r[0],
+            "role": r[1],
+            "total_domains": r[2]
+        }
+        for r in rows
+    ]
+
+@app.delete("/admin/api/users/{target_username}")
+def delete_registered_user(target_username: str, request: Request):
+    session = require_session(request)
+    if session["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat menghapus akun user")
+    if target_username in ("admin", session["username"]):
+        raise HTTPException(status_code=400, detail="Akun admin utama atau akun yang sedang digunakan tidak dapat dihapus")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(q("DELETE FROM clients WHERE owner=?"), (target_username,))
+    cursor.execute(q("DELETE FROM users WHERE username=?"), (target_username,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "success", "message": f"User {target_username} berhasil dihapus"}
+
 # --- ENDPOINT API MANAJEMEN DOMAIN ---
 @app.get("/admin/api/domains")
 def get_all_domains(request: Request):
