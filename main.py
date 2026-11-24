@@ -23,7 +23,7 @@ DB_FILE = "waf_database.db"
 DATABASE_URL = os.getenv("DATABASE_URL")
 WAF_SECRET = os.getenv("WAF_SECRET", "warden-waf-enterprise-secret-2026")
 
-# --- KONFIGURASI DURASI BLOKIR BERTINGKAT (DETIK) ---
+# --- KONFIGURASI DURASI BLOKIR BERTINGKAT DEFAULT (DETIK) ---
 # Pelanggaran ke-1: 5 menit | ke-2: 30 menit | ke-3: 2 jam | ke-4+: 24 jam
 BAN_ESCALATION_SECONDS = [300, 1800, 7200, 86400]
 TIME_WINDOW = 10
@@ -63,6 +63,22 @@ def format_duration_id(seconds: int) -> str:
         parts.append(f"{secs} detik")
     return " ".join(parts) if parts else "1 detik"
 
+def resolve_ban_seconds(
+    ban_type: Optional[str],
+    duration_value: Optional[int],
+    duration_unit: Optional[str],
+    duration_minutes: Optional[int] = None
+) -> int:
+    """Mengonversi pilihan mode blokir menjadi detik (0 = Permanen)."""
+    if ban_type == "permanent":
+        return 0
+    if duration_value is not None:
+        val = max(1, int(duration_value))
+        return val if duration_unit == "seconds" else val * 60
+    if duration_minutes is not None:
+        return 0 if int(duration_minutes) <= 0 else int(duration_minutes) * 60
+    return 1800
+
 # --- 1. SETUP & MIGRASI DATABASE ---
 def init_db():
     conn = get_db()
@@ -74,8 +90,10 @@ def init_db():
             waf_enabled BOOLEAN NOT NULL,
             rate_limit INTEGER NOT NULL,
             status TEXT NOT NULL,
-            owner TEXT NOT NULL
+            owner TEXT NOT NULL,
+            auto_ban_minutes INTEGER NOT NULL DEFAULT 0
         )''')
+        cursor.execute("ALTER TABLE clients ADD COLUMN IF NOT EXISTS auto_ban_minutes INTEGER NOT NULL DEFAULT 0")
         cursor.execute('''CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
@@ -112,7 +130,8 @@ def init_db():
             waf_enabled BOOLEAN NOT NULL,
             rate_limit INTEGER NOT NULL,
             status TEXT NOT NULL,
-            owner TEXT NOT NULL
+            owner TEXT NOT NULL,
+            auto_ban_minutes INTEGER NOT NULL DEFAULT 0
         )''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -142,6 +161,7 @@ def init_db():
             hit_time REAL NOT NULL
         )''')
         for alter_sql in [
+            "ALTER TABLE clients ADD COLUMN auto_ban_minutes INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE banned_ips ADD COLUMN banned_until REAL",
             "ALTER TABLE banned_ips ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 1"
         ]:
@@ -161,18 +181,29 @@ class ClientConfig(BaseModel):
     origin_server: Optional[str] = ""
     waf_enabled: bool = True
     rate_limit: int = 20
+    auto_ban_minutes: Optional[int] = 0  # 0 = Auto-Eskalasi, >0 = Sementara X menit, -1 = Permanen
 
 class ClientUpdateConfig(BaseModel):
     origin_server: str
     waf_enabled: bool
     rate_limit: int
     status: str
+    auto_ban_minutes: Optional[int] = 0
 
 class ManualBanData(BaseModel):
     ip_address: str
     domain: Optional[str] = "Semua Domain (Manual)"
-    reason: Optional[str] = "Diblokir Manual oleh Admin"
-    duration_minutes: Optional[int] = 30
+    reason: Optional[str] = "Diblokir Manual"
+    ban_type: Optional[str] = "temporary"  # "temporary" atau "permanent"
+    duration_value: Optional[int] = 30
+    duration_unit: Optional[str] = "minutes"  # "seconds" atau "minutes"
+    duration_minutes: Optional[int] = None
+
+class BanUpdateData(BaseModel):
+    ban_type: str = "temporary"  # "temporary" atau "permanent"
+    duration_value: Optional[int] = 30
+    duration_unit: Optional[str] = "minutes"  # "seconds" atau "minutes"
+    reason: Optional[str] = None
 
 class AuthData(BaseModel):
     username: str
@@ -222,7 +253,7 @@ def require_session(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Sesi tidak valid atau telah berakhir. Silakan login kembali.")
     return session
 
-# --- FUNGSI HELPER PEMBLOKIRAN TIMER & ESKALASI BERTINGKAT ---
+# --- FUNGSI HELPER PEMBLOKIRAN TIMER & PERMANEN ---
 def is_ip_banned(ip: str) -> Optional[dict]:
     conn = get_db()
     cursor = conn.cursor()
@@ -316,10 +347,7 @@ def ban_ip_with_escalation(ip: str, domain: str, reason: str, custom_duration_se
     }
 
 def check_and_record_rate_limit(ip: str, limit: int) -> bool:
-    """
-    Mencatat permintaan di database agar konsisten di seluruh worker.
-    Mengembalikan True jika jumlah request dalam TIME_WINDOW sudah mencapai batas.
-    """
+    """Mencatat permintaan di database agar konsisten di seluruh worker."""
     now = time.time()
     window_start = now - TIME_WINDOW
     conn = get_db()
@@ -399,7 +427,7 @@ async def verify_js_challenge(data: ChallengeVerifyData, request: Request):
         sisa_str = format_duration_id(rem) if rem else "Permanen"
         raise HTTPException(
             status_code=403,
-            detail=f"IP Anda sedang diblokir sementara karena {active_ban['reason']} (Sisa waktu: {sisa_str})."
+            detail=f"IP Anda sedang diblokir karena {active_ban['reason']} (Durasi: {sisa_str})."
         )
 
     try:
@@ -525,10 +553,10 @@ def get_all_domains(request: Request):
     conn = get_db()
     cursor = conn.cursor()
     if session["role"] == 'admin':
-        cursor.execute("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients ORDER BY domain ASC")
+        cursor.execute("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner, auto_ban_minutes FROM clients ORDER BY domain ASC")
     else:
         cursor.execute(
-            q("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner FROM clients WHERE owner=? ORDER BY domain ASC"),
+            q("SELECT domain, origin_server, waf_enabled, rate_limit, status, owner, auto_ban_minutes FROM clients WHERE owner=? ORDER BY domain ASC"),
             (session["username"],)
         )
     rows = cursor.fetchall()
@@ -541,7 +569,8 @@ def get_all_domains(request: Request):
             "waf_enabled": bool(r[2]),
             "rate_limit": r[3],
             "status": r[4],
-            "owner": r[5]
+            "owner": r[5],
+            "auto_ban_minutes": r[6] if r[6] is not None else 0
         }
         for r in rows
     ]
@@ -565,23 +594,25 @@ def add_domain(config: ClientConfig, request: Request):
 
     status = 'approved' if session["role"] == 'admin' else 'pending'
     waf_status = bool(config.waf_enabled) if session["role"] == 'admin' else False
+    auto_ban_val = config.auto_ban_minutes if config.auto_ban_minutes is not None else 0
 
     if USE_POSTGRES:
         cursor.execute(
-            """INSERT INTO clients (domain, origin_server, waf_enabled, rate_limit, status, owner)
-               VALUES (%s, %s, %s, %s, %s, %s)
+            """INSERT INTO clients (domain, origin_server, waf_enabled, rate_limit, status, owner, auto_ban_minutes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (domain) DO UPDATE SET
                    origin_server = EXCLUDED.origin_server,
                    waf_enabled = EXCLUDED.waf_enabled,
                    rate_limit = EXCLUDED.rate_limit,
                    status = EXCLUDED.status,
-                   owner = EXCLUDED.owner""",
-            (clean_domain, origin, waf_status, config.rate_limit, status, session["username"])
+                   owner = EXCLUDED.owner,
+                   auto_ban_minutes = EXCLUDED.auto_ban_minutes""",
+            (clean_domain, origin, waf_status, config.rate_limit, status, session["username"], auto_ban_val)
         )
     else:
         cursor.execute(
-            "INSERT OR REPLACE INTO clients VALUES (?, ?, ?, ?, ?, ?)",
-            (clean_domain, origin, waf_status, config.rate_limit, status, session["username"])
+            "INSERT OR REPLACE INTO clients (domain, origin_server, waf_enabled, rate_limit, status, owner, auto_ban_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (clean_domain, origin, waf_status, config.rate_limit, status, session["username"], auto_ban_val)
         )
     conn.commit()
     cursor.close()
@@ -606,10 +637,11 @@ def update_domain(target_domain: str, config: ClientUpdateConfig, request: Reque
         clean_origin = f"https://{clean_origin}"
     clean_status = config.status if config.status in ("approved", "pending") else "approved"
     waf_val = bool(config.waf_enabled) if clean_status == "approved" else False
+    auto_ban_val = config.auto_ban_minutes if config.auto_ban_minutes is not None else 0
 
     cursor.execute(
-        q("UPDATE clients SET origin_server=?, waf_enabled=?, rate_limit=?, status=? WHERE domain=?"),
-        (clean_origin, waf_val, max(1, config.rate_limit), clean_status, target_domain)
+        q("UPDATE clients SET origin_server=?, waf_enabled=?, rate_limit=?, status=?, auto_ban_minutes=? WHERE domain=?"),
+        (clean_origin, waf_val, max(1, config.rate_limit), clean_status, auto_ban_val, target_domain)
     )
     conn.commit()
     cursor.close()
@@ -700,7 +732,7 @@ def clear_all_logs(request: Request):
     conn.close()
     return {"status": "success", "message": "Seluruh log serangan berhasil dibersihkan"}
 
-# --- ENDPOINT DAFTAR, BLOKIR MANUAL & UNBLOKIR IP TIMER ---
+# --- ENDPOINT DAFTAR, BLOKIR MANUAL, EDIT TIMER/PERMANEN & UNBLOKIR IP ---
 @app.get("/admin/api/banned-ips")
 def get_banned_ips(request: Request):
     session = require_session(request)
@@ -770,9 +802,12 @@ def manual_ban_ip(data: ManualBanData, request: Request):
     else:
         target_dom = target_dom or "Semua Domain (Manual)"
 
-    duration_sec = None
-    if data.duration_minutes is not None:
-        duration_sec = data.duration_minutes * 60 if data.duration_minutes > 0 else 0
+    duration_sec = resolve_ban_seconds(
+        data.ban_type,
+        data.duration_value,
+        data.duration_unit,
+        data.duration_minutes
+    )
 
     default_reason = "Diblokir Manual oleh Admin" if session["role"] == "admin" else f"Diblokir oleh Pemilik ({session['username']})"
     ban_info = ban_ip_with_escalation(
@@ -784,6 +819,52 @@ def manual_ban_ip(data: ManualBanData, request: Request):
     return {
         "status": "success",
         "message": f"IP {clean_ip} berhasil diblokir pada {target_dom} ({ban_info['duration_label']})"
+    }
+
+@app.put("/admin/api/banned-ips/{target_ip:path}")
+def update_banned_ip(target_ip: str, data: BanUpdateData, request: Request):
+    """Mengedit timer blokir sementara atau mengubahnya menjadi blokir permanen."""
+    session = require_session(request)
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if session["role"] != 'admin':
+        cursor.execute(
+            q("""SELECT b.reason FROM banned_ips b
+                 INNER JOIN clients c ON b.domain = c.domain
+                 WHERE b.ip_address=? AND c.owner=?"""),
+            (target_ip, session["username"])
+        )
+    else:
+        cursor.execute(q("SELECT reason FROM banned_ips WHERE ip_address=?"), (target_ip,))
+
+    existing = cursor.fetchone()
+    if not existing:
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="Data blokir IP tidak ditemukan atau Anda tidak memiliki akses")
+
+    duration_sec = resolve_ban_seconds(data.ban_type, data.duration_value, data.duration_unit)
+    new_reason = (data.reason or existing[0]).strip() or existing[0]
+
+    if duration_sec <= 0:
+        new_banned_until = None
+        duration_label = "Permanen"
+    else:
+        new_banned_until = time.time() + duration_sec
+        duration_label = format_duration_id(duration_sec)
+
+    cursor.execute(
+        q("UPDATE banned_ips SET banned_until=?, reason=? WHERE ip_address=?"),
+        (new_banned_until, new_reason, target_ip)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return {
+        "status": "success",
+        "message": f"Durasi blokir IP {target_ip} diperbarui menjadi {duration_label}"
     }
 
 @app.delete("/admin/api/banned-ips/{target_ip:path}")
@@ -928,7 +1009,7 @@ async def reverse_proxy(request: Request, path: str):
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(q("SELECT origin_server, waf_enabled, rate_limit, status FROM clients WHERE domain=?"), (target_domain,))
+    cursor.execute(q("SELECT origin_server, waf_enabled, rate_limit, status, auto_ban_minutes FROM clients WHERE domain=?"), (target_domain,))
     row = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -951,17 +1032,35 @@ async def reverse_proxy(request: Request, path: str):
             resp_404.delete_cookie("warden_site", path="/")
         return resp_404
 
-    client_config = {"origin": row[0], "waf_enabled": bool(row[1]), "rate_limit": row[2], "status": row[3]}
+    auto_ban_minutes = row[4] if row[4] is not None else 0
+    if auto_ban_minutes == -1:
+        auto_custom_seconds = 0  # Permanen
+    elif auto_ban_minutes > 0:
+        auto_custom_seconds = auto_ban_minutes * 60
+    else:
+        auto_custom_seconds = None  # Auto-eskalasi
+
+    client_config = {
+        "origin": row[0],
+        "waf_enabled": bool(row[1]),
+        "rate_limit": row[2],
+        "status": row[3],
+        "auto_custom_seconds": auto_custom_seconds
+    }
 
     if client_config["status"] == "pending":
         return JSONResponse(status_code=403, content={"error": "Domain ini sedang menunggu persetujuan Admin."})
 
-    # 1. CEK APAKAH IP SEDANG DALAM MASA BLOKIR TIMER
+    # 1. CEK APAKAH IP SEDANG DALAM MASA BLOKIR (TIMER ATAU PERMANEN)
     active_ban = is_ip_banned(client_ip)
     if active_ban:
         rem = active_ban["remaining_seconds"]
         headers = {"Retry-After": str(rem)} if rem else {}
-        sisa_str = format_duration_id(rem) if rem else "Permanen"
+        reason_msg = (
+            f"IP Anda ({client_ip}) diblokir secara PERMANEN karena {active_ban['reason']}."
+            if rem is None
+            else f"IP Anda ({client_ip}) diblokir sementara karena {active_ban['reason']}. Otomatis dibuka dalam {format_duration_id(rem)}."
+        )
         return JSONResponse(
             status_code=403,
             headers=headers,
@@ -971,17 +1070,23 @@ async def reverse_proxy(request: Request, path: str):
                 "offense_count": active_ban["ban_count"],
                 "remaining_seconds": rem,
                 "unblock_at": active_ban["unblock_at"],
-                "reason": f"IP Anda ({client_ip}) diblokir sementara karena {active_ban['reason']}. Otomatis dibuka dalam {sisa_str}."
+                "reason": reason_msg
             }
         )
 
-    # 2. DETEKSI SERANGAN SQL INJECTION / XSS -> BLOKIR TIMER BERTINGKAT
+    # 2. DETEKSI SERANGAN SQL INJECTION / XSS -> BLOKIR
     if client_config["waf_enabled"] and is_malicious(str(request.url)):
-        ban_info = ban_ip_with_escalation(client_ip, target_domain, "SQLi/XSS Injection")
+        ban_info = ban_ip_with_escalation(
+            client_ip,
+            target_domain,
+            "SQLi/XSS Injection",
+            custom_duration_seconds=client_config["auto_custom_seconds"]
+        )
         log_attack(client_ip, target_domain, f"SQLi/XSS Injection (Pelanggaran #{ban_info['ban_count']} - {ban_info['duration_label']})")
+        headers = {"Retry-After": str(ban_info["remaining_seconds"])} if ban_info["remaining_seconds"] else {}
         return JSONResponse(
             status_code=403,
-            headers={"Retry-After": str(ban_info["remaining_seconds"])},
+            headers=headers,
             content={
                 "status": "blocked",
                 "firewall": "WardenWAF",
@@ -989,17 +1094,23 @@ async def reverse_proxy(request: Request, path: str):
                 "ban_duration": ban_info["duration_label"],
                 "remaining_seconds": ban_info["remaining_seconds"],
                 "unblock_at": ban_info["unblock_at_str"],
-                "reason": f"Serangan SQLi/XSS terdeteksi (Pelanggaran ke-{ban_info['ban_count']}). IP diblokir selama {ban_info['duration_label']}."
+                "reason": f"Serangan SQLi/XSS terdeteksi (Pelanggaran ke-{ban_info['ban_count']}). Status blokir: {ban_info['duration_label']}."
             }
         )
 
-    # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR TIMER BERTINGKAT (TERCATAT DI DB)
+    # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR
     if check_and_record_rate_limit(client_ip, client_config["rate_limit"]):
-        ban_info = ban_ip_with_escalation(client_ip, target_domain, "DDoS / Flood Rate Limit")
+        ban_info = ban_ip_with_escalation(
+            client_ip,
+            target_domain,
+            "DDoS / Flood Rate Limit",
+            custom_duration_seconds=client_config["auto_custom_seconds"]
+        )
         log_attack(client_ip, target_domain, f"DDoS / Flood Rate Limit (Pelanggaran #{ban_info['ban_count']} - {ban_info['duration_label']})")
+        headers = {"Retry-After": str(ban_info["remaining_seconds"])} if ban_info["remaining_seconds"] else {}
         return JSONResponse(
             status_code=429,
-            headers={"Retry-After": str(ban_info["remaining_seconds"])},
+            headers=headers,
             content={
                 "status": "blocked",
                 "firewall": "WardenWAF",
@@ -1007,7 +1118,7 @@ async def reverse_proxy(request: Request, path: str):
                 "ban_duration": ban_info["duration_label"],
                 "remaining_seconds": ban_info["remaining_seconds"],
                 "unblock_at": ban_info["unblock_at_str"],
-                "reason": f"Terlalu banyak permintaan / DDoS Flood (Pelanggaran ke-{ban_info['ban_count']}). IP diblokir selama {ban_info['duration_label']}."
+                "reason": f"Terlalu banyak permintaan / DDoS Flood (Pelanggaran ke-{ban_info['ban_count']}). Status blokir: {ban_info['duration_label']}."
             }
         )
 

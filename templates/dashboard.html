@@ -207,14 +207,14 @@
                 <div class="max-w-3xl mx-auto text-center space-y-4 relative z-10">
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-semibold text-emerald-400">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                        <span>Enterprise Edge Network &amp; Escalating Timed Ban</span>
+                        <span>Enterprise Edge Network &amp; Timed / Permanent IP Blocking</span>
                     </div>
 
                     <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                         Protecting today?
                     </h1>
                     <p class="text-xs text-slate-400 max-w-lg mx-auto">
-                        Pantau simpul domain terproteksi, filter serangan SQLi/XSS/DDoS, dan kelola pemblokiran otomatis berbasis timer bertingkat.
+                        Pantau simpul domain terproteksi, filter serangan SQLi/XSS/DDoS, dan kelola pemblokiran sementara maupun permanen.
                     </p>
 
                     <div class="relative text-left pt-1">
@@ -276,7 +276,7 @@
                         </div>
                         <div class="min-w-0">
                             <div class="text-[11px] font-mono text-emerald-400">WAF ENGINE</div>
-                            <div class="text-xs font-extrabold text-white truncate">SQLi &bull; XSS &bull; Timed Ban</div>
+                            <div class="text-xs font-extrabold text-white truncate">SQLi &bull; XSS &bull; Timed / Perm Ban</div>
                         </div>
                     </div>
 
@@ -327,7 +327,7 @@
                     <div id="overviewDomainsList" class="divide-y divide-slate-800/80 border-t border-slate-800/80"></div>
                 </section>
 
-                <!-- COLUMN 2: BLOCKED IPS (TIMER) -->
+                <!-- COLUMN 2: BLOCKED IPS (TIMER & PERMANEN) -->
                 <section id="overviewBannedCol" class="rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5 space-y-3">
                     <div class="flex items-center justify-between">
                         <button onclick="switchView('banned')" class="inline-flex items-center gap-1.5 text-sm font-bold text-white hover:text-emerald-400 transition">
@@ -376,7 +376,7 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 class="text-xl font-extrabold text-white">Domains</h1>
-                    <p class="text-xs text-slate-400 mt-0.5">Kelola simpul domain Reverse Proxy dan aturan penyaringan WardenWAF.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Kelola simpul domain Reverse Proxy, batas rate limit, dan kebijakan pemblokiran otomatis.</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <span id="userNoticeBanner" class="hidden px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
@@ -414,6 +414,7 @@
                                 <th class="py-3.5 px-4">Domain</th>
                                 <th class="py-3.5 px-4">Origin Target</th>
                                 <th class="py-3.5 px-4">Rate Limit</th>
+                                <th class="py-3.5 px-4">Auto-Ban</th>
                                 <th class="py-3.5 px-4">Owner</th>
                                 <th class="py-3.5 px-4">Status</th>
                                 <th class="py-3.5 px-4">WAF</th>
@@ -422,7 +423,7 @@
                         </thead>
                         <tbody id="domainsTableBody" class="divide-y divide-slate-800/80">
                             <tr>
-                                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Memuat data domain...</td>
+                                <td colspan="8" class="py-8 text-center text-slate-500 text-xs">Memuat data domain...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -430,16 +431,16 @@
             </div>
         </section>
 
-        <!-- VIEW 3: BANNED IPS WITH COUNTDOWN TIMER (ADMIN: ALL DOMAINS | USER: OWN DOMAINS) -->
+        <!-- VIEW 3: BANNED IPS WITH COUNTDOWN TIMER & PERMANENT BAN -->
         <section id="view-banned" class="hidden flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-xl font-extrabold text-white">Blokir IP Berbasis Timer</h1>
+                        <h1 class="text-xl font-extrabold text-white">Blokir IP (Timer &amp; Permanen)</h1>
                         <span id="bannedScopeBadge" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">Auto-Escalate</span>
                     </div>
                     <p id="bannedScopeDesc" class="text-xs text-slate-400 mt-0.5">
-                        Pelanggaran ke-1 diblokir <span class="text-slate-200 font-semibold">5 menit</span>, ke-2 <span class="text-slate-200 font-semibold">30 menit</span>, ke-3 <span class="text-slate-200 font-semibold">2 jam</span>, ke-4+ <span class="text-slate-200 font-semibold">24 jam</span>. Otomatis terbuka saat timer habis.
+                        Kelola pemblokiran sementara maupun permanen. Klik <span class="text-slate-200 font-semibold">Edit Timer</span> untuk mengubah durasi timer atau menjadikannya blokir permanen.
                     </p>
                 </div>
                 <button onclick="openManualBanModal()"
@@ -449,8 +450,16 @@
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <input type="text" id="searchBannedInput" oninput="renderBannedTable()" placeholder="Cari alamat IP, domain, atau alasan..."
-                    class="w-full sm:w-80 px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                <div class="flex flex-wrap items-center gap-2 flex-1">
+                    <input type="text" id="searchBannedInput" oninput="renderBannedTable()" placeholder="Cari alamat IP, domain, atau alasan..."
+                        class="w-full sm:w-72 px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                    <select id="filterBanMode" onchange="renderBannedTable()"
+                        class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="all">Mode: Semua</option>
+                        <option value="temporary">Sementara (Timer)</option>
+                        <option value="permanent">Permanen</option>
+                    </select>
+                </div>
                 <button onclick="loadBannedIps(true)"
                     class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-xs font-medium transition">
                     Refresh Daftar
@@ -465,7 +474,7 @@
                                 <th class="py-3.5 px-4">Alamat IP</th>
                                 <th class="py-3.5 px-4">Domain Target</th>
                                 <th class="py-3.5 px-4">Alasan &amp; Tingkat</th>
-                                <th class="py-3.5 px-4">Sisa Timer</th>
+                                <th class="py-3.5 px-4">Sisa Timer / Status</th>
                                 <th class="py-3.5 px-4">Otomatis Dibuka</th>
                                 <th class="py-3.5 px-4 text-right">Aksi</th>
                             </tr>
@@ -600,11 +609,24 @@
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">URL / IP Server Asli (Origin Target)</label>
                     <input type="text" id="originInput" required placeholder="Contoh: https://relation.n-oceano22.workers.dev"
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
-                    <p class="text-[11px] text-slate-500 mt-1">Isi dengan alamat server tujuan yang ingin dilindungi.</p>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Batas Permintaan (Rate Limit / 10 Detik)</label>
                     <input type="number" id="rateLimitInput" value="20" min="1" max="1000" required
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kebijakan Blokir Otomatis Saat Serangan</label>
+                    <select id="addAutoBanPolicy" onchange="toggleAddAutoBanCustom()"
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="0" selected>Auto-Eskalasi (5m &rarr; 30m &rarr; 2j &rarr; 24j)</option>
+                        <option value="custom">Blokir Sementara Kustom (Menit)</option>
+                        <option value="-1">Langsung Blokir Permanen</option>
+                    </select>
+                </div>
+                <div id="addAutoBanCustomBox" class="hidden">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Durasi Blokir Otomatis (Menit)</label>
+                    <input type="number" id="addAutoBanCustomMinutes" value="15" min="1" max="525600"
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
@@ -654,6 +676,20 @@
                         </select>
                     </div>
                 </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kebijakan Blokir Otomatis Saat Serangan</label>
+                    <select id="editAutoBanPolicy" onchange="toggleEditAutoBanCustom()"
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="0">Auto-Eskalasi (5m &rarr; 30m &rarr; 2j &rarr; 24j)</option>
+                        <option value="custom">Blokir Sementara Kustom (Menit)</option>
+                        <option value="-1">Langsung Blokir Permanen</option>
+                    </select>
+                </div>
+                <div id="editAutoBanCustomBox" class="hidden">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Durasi Blokir Otomatis (Menit)</label>
+                    <input type="number" id="editAutoBanCustomMinutes" value="15" min="1" max="525600"
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
                 <div class="flex items-center justify-between bg-slate-950/90 border border-slate-800 rounded-xl p-3.5">
                     <div>
                         <div class="text-xs font-bold text-slate-200">Perlindungan WAF &amp; JS Challenge</div>
@@ -675,7 +711,7 @@
         </div>
     </div>
 
-    <!-- MODAL: BLOKIR IP MANUAL DENGAN TIMER (ADMIN: SEMUA DOMAIN | USER: DOMAIN SENDIRI) -->
+    <!-- MODAL: BLOKIR IP MANUAL (SEMENTARA TIMER KUSTOM / PERMANEN) -->
     <div id="manualBanModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
@@ -689,16 +725,38 @@
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Durasi Timer Pemblokiran</label>
-                    <select id="banDurationInput"
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jenis Pemblokiran</label>
+                    <select id="banTypeInput" onchange="toggleManualBanFields()"
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500">
-                        <option value="5">5 Menit</option>
-                        <option value="30" selected>30 Menit</option>
-                        <option value="120">2 Jam</option>
-                        <option value="1440">24 Jam</option>
-                        <option value="0">Permanen (Tanpa Timer)</option>
+                        <option value="temporary" selected>Blokir Sementara (Timer)</option>
+                        <option value="permanent">Blokir Permanen (Selamanya)</option>
                     </select>
                 </div>
+
+                <div id="manualBanTimerBox" class="space-y-2.5 rounded-xl bg-slate-950/90 border border-slate-800 p-3.5">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Atur Durasi Timer</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" id="banDurationValue" value="30" min="1" max="525600"
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-mono text-white focus:outline-none focus:border-rose-500">
+                        <select id="banDurationUnit"
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-rose-500">
+                            <option value="minutes" selected>Menit</option>
+                            <option value="seconds">Detik</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5 pt-1">
+                        <button type="button" onclick="setManualBanPreset(1, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">1 Menit</button>
+                        <button type="button" onclick="setManualBanPreset(5, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">5 Menit</button>
+                        <button type="button" onclick="setManualBanPreset(30, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">30 Menit</button>
+                        <button type="button" onclick="setManualBanPreset(120, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">2 Jam</button>
+                        <button type="button" onclick="setManualBanPreset(1440, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">24 Jam</button>
+                    </div>
+                </div>
+
+                <div id="manualBanPermNotice" class="hidden rounded-xl bg-rose-950/40 border border-rose-500/30 p-3 text-xs text-rose-300">
+                    IP ini akan diblokir secara <strong>permanen</strong> dan tidak akan terbuka otomatis hingga dibuka secara manual.
+                </div>
+
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Domain Target</label>
                     <select id="banDomainSelect" required
@@ -718,6 +776,81 @@
                     <button type="submit"
                         class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition">
                         Terapkan Blokir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT TIMER / UBAH KE BLOKIR PERMANEN -->
+    <div id="editBanModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-sm font-bold text-white">Edit Timer / Mode Blokir IP</h3>
+                <button onclick="closeEditBanModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+            </div>
+            <form onsubmit="submitEditBan(event)" class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Alamat IP</label>
+                        <input type="text" id="editBanIp" readonly
+                            class="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-xs font-mono font-bold text-rose-400 cursor-not-allowed">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Domain Target</label>
+                        <input type="text" id="editBanDomain" readonly
+                            class="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-400 cursor-not-allowed">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Mode Pemblokiran</label>
+                    <select id="editBanType" onchange="toggleEditBanFields()"
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="temporary">Blokir Sementara (Timer)</option>
+                        <option value="permanent">Blokir Permanen (Selamanya)</option>
+                    </select>
+                </div>
+
+                <div id="editBanTimerBox" class="space-y-2.5 rounded-xl bg-slate-950/90 border border-slate-800 p-3.5">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Set Ulang Durasi Timer Dari Sekarang</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" id="editBanDurationValue" value="15" min="1" max="525600"
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm font-mono text-white focus:outline-none focus:border-emerald-500">
+                        <select id="editBanDurationUnit"
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <option value="minutes" selected>Menit</option>
+                            <option value="seconds">Detik</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5 pt-1">
+                        <button type="button" onclick="setEditBanPreset(30, 'seconds')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">30 Detik</button>
+                        <button type="button" onclick="setEditBanPreset(1, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">1 Menit</button>
+                        <button type="button" onclick="setEditBanPreset(5, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">5 Menit</button>
+                        <button type="button" onclick="setEditBanPreset(30, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">30 Menit</button>
+                        <button type="button" onclick="setEditBanPreset(120, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">2 Jam</button>
+                        <button type="button" onclick="setEditBanPreset(1440, 'minutes')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-mono text-slate-300">24 Jam</button>
+                    </div>
+                </div>
+
+                <div id="editBanPermNotice" class="hidden rounded-xl bg-rose-950/40 border border-rose-500/30 p-3 text-xs text-rose-300">
+                    Status akan diubah menjadi <strong>Blokir Permanen</strong> tanpa batas waktu otomatis.
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alasan Pemblokiran</label>
+                    <input type="text" id="editBanReason" required
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeEditBanModal()"
+                        class="px-4 py-2 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition">
+                        Simpan Timer
                     </button>
                 </div>
             </form>
@@ -773,6 +906,13 @@
             const secs = s % 60;
             const pad = (n) => String(n).padStart(2, "0");
             return hrs > 0 ? `${pad(hrs)}:${pad(mins)}:${pad(secs)}` : `${pad(mins)}:${pad(secs)}`;
+        }
+
+        function formatAutoBanPolicyLabel(autoBanMinutes) {
+            const val = Number(autoBanMinutes || 0);
+            if (val === -1) return "Permanen";
+            if (val > 0) return `${val} Menit`;
+            return "Auto-Eskalasi";
         }
 
         function handleUnauthorized(res) {
@@ -853,7 +993,7 @@
                 overview: "Beranda WAF",
                 domains: "Domains",
                 logs: "Observability & Logs",
-                banned: "Blokir IP (Timer)",
+                banned: "Blokir IP (Timer & Permanen)",
                 users: "Manajemen User"
             };
 
@@ -979,7 +1119,7 @@
                 document.getElementById("userNoticeBanner").classList.remove("hidden");
                 document.getElementById("bannedScopeBadge").textContent = "Domain Milik Anda";
                 document.getElementById("bannedScopeDesc").innerHTML =
-                    `Menampilkan IP yang diblokir pada <span class="text-slate-200 font-semibold">domain milik Anda sendiri</span>. Pelanggaran ke-1 diblokir 5 menit, ke-2 30 menit, ke-3 2 jam, ke-4+ 24 jam, dan Anda dapat membuka blokir khusus domain Anda.`;
+                    `Menampilkan IP terblokir pada <span class="text-slate-200 font-semibold">domain milik Anda sendiri</span>. Gunakan <span class="text-slate-200 font-semibold">Edit Timer</span> untuk mengubah durasi blokir sementara atau menjadikannya permanen.`;
             }
 
             await syncAllData(false);
@@ -1033,23 +1173,29 @@
                 `).join("");
             }
 
-            // Overview Banned IPs List (with live countdown)
+            // Overview Banned IPs List (with live countdown or Permanen badge)
             const banContainer = document.getElementById("overviewBannedList");
             if (bannedIpsCache.length === 0) {
                 banContainer.innerHTML = '<div class="py-4 text-xs text-slate-500">Tidak ada IP yang sedang diblokir.</div>';
             } else {
-                banContainer.innerHTML = bannedIpsCache.slice(0, 5).map(b => `
-                    <button onclick="switchView('banned')" type="button"
-                        class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-800/40 rounded-lg transition group">
-                        <div class="min-w-0">
-                            <div class="text-xs font-mono font-semibold text-rose-400 group-hover:text-rose-300 truncate">${escapeHtml(b.ip_address)}</div>
-                            <div class="text-[11px] text-slate-400 truncate">${escapeHtml(b.domain)} &bull; ${escapeHtml(b.reason)} (Ke-${Number(b.ban_count || 1)})</div>
-                        </div>
-                        <span class="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-[11px] font-mono text-rose-300 shrink-0 ml-2">
-                            ${escapeHtml(formatCountdown(b.remaining_seconds))}
-                        </span>
-                    </button>
-                `).join("");
+                banContainer.innerHTML = bannedIpsCache.slice(0, 5).map(b => {
+                    const isPerm = b.remaining_seconds === null;
+                    const badgeClass = isPerm
+                        ? "bg-rose-500/20 border-rose-500/40 text-rose-300 font-bold"
+                        : "bg-amber-500/15 border-amber-500/30 text-amber-300";
+                    return `
+                        <button onclick="switchView('banned')" type="button"
+                            class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-800/40 rounded-lg transition group">
+                            <div class="min-w-0">
+                                <div class="text-xs font-mono font-semibold text-rose-400 group-hover:text-rose-300 truncate">${escapeHtml(b.ip_address)}</div>
+                                <div class="text-[11px] text-slate-400 truncate">${escapeHtml(b.domain)} &bull; ${escapeHtml(b.reason)}</div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded border text-[11px] font-mono shrink-0 ml-2 ${badgeClass}">
+                                ${escapeHtml(formatCountdown(b.remaining_seconds))}
+                            </span>
+                        </button>
+                    `;
+                }).join("");
             }
 
             // Overview Attack Logs List
@@ -1174,7 +1320,23 @@
         }
 
         // --- DOMAIN CRUD ---
+        function toggleAddAutoBanCustom() {
+            const val = document.getElementById("addAutoBanPolicy").value;
+            const box = document.getElementById("addAutoBanCustomBox");
+            if (val === "custom") box.classList.remove("hidden");
+            else box.classList.add("hidden");
+        }
+
+        function toggleEditAutoBanCustom() {
+            const val = document.getElementById("editAutoBanPolicy").value;
+            const box = document.getElementById("editAutoBanCustomBox");
+            if (val === "custom") box.classList.remove("hidden");
+            else box.classList.add("hidden");
+        }
+
         function openAddDomainModal() {
+            document.getElementById("addAutoBanPolicy").value = "0";
+            toggleAddAutoBanCustom();
             document.getElementById("addDomainModal").classList.remove("hidden");
             setTimeout(() => document.getElementById("domainInput").focus(), 50);
         }
@@ -1210,7 +1372,7 @@
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-slate-500 text-xs">Tidak ada konfigurasi domain yang sesuai.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="py-10 text-center text-slate-500 text-xs">Tidak ada konfigurasi domain yang sesuai.</td></tr>';
                 return;
             }
 
@@ -1223,6 +1385,11 @@
                 const wafBadge = d.waf_enabled
                     ? '<span class="inline-flex items-center gap-1.5 text-emerald-400 font-bold text-xs"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>On</span>'
                     : '<span class="inline-flex items-center gap-1.5 text-slate-500 font-medium text-xs"><span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>Off</span>';
+
+                const policyLabel = formatAutoBanPolicyLabel(d.auto_ban_minutes);
+                const policyBadge = Number(d.auto_ban_minutes) === -1
+                    ? `<span class="px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[11px] font-mono">${escapeHtml(policyLabel)}</span>`
+                    : `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] font-mono">${escapeHtml(policyLabel)}</span>`;
 
                 const approveBtn = (CURRENT_ROLE === "admin" && !isApproved)
                     ? `<button onclick="approveDomain('${escapeHtml(d.domain)}')" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-bold transition">ACC</button>`
@@ -1237,6 +1404,7 @@
                         <td class="py-3.5 px-4 font-bold text-white">${escapeHtml(d.domain)}</td>
                         <td class="py-3.5 px-4 text-slate-300 font-mono text-xs">${escapeHtml(d.origin_server)}</td>
                         <td class="py-3.5 px-4 text-xs font-mono text-slate-300">${escapeHtml(d.rate_limit)} req/10s</td>
+                        <td class="py-3.5 px-4">${policyBadge}</td>
                         <td class="py-3.5 px-4"><span class="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-xs font-medium">${escapeHtml(d.owner)}</span></td>
                         <td class="py-3.5 px-4">${statusBadge}</td>
                         <td class="py-3.5 px-4">${wafBadge}</td>
@@ -1259,11 +1427,15 @@
             const domain = document.getElementById("domainInput").value.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
             const origin_server = document.getElementById("originInput").value.trim().replace(/\/$/, "");
             const rate_limit = parseInt(document.getElementById("rateLimitInput").value, 10) || 20;
+            const policySel = document.getElementById("addAutoBanPolicy").value;
+            let auto_ban_minutes = 0;
+            if (policySel === "-1") auto_ban_minutes = -1;
+            else if (policySel === "custom") auto_ban_minutes = Math.max(1, parseInt(document.getElementById("addAutoBanCustomMinutes").value, 10) || 15);
 
             const res = await fetch("/admin/api/domains", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ domain, origin_server, waf_enabled: true, rate_limit })
+                body: JSON.stringify({ domain, origin_server, waf_enabled: true, rate_limit, auto_ban_minutes })
             });
 
             if (handleUnauthorized(res)) return;
@@ -1288,6 +1460,17 @@
             document.getElementById("editStatus").value = item.status;
             document.getElementById("editWafEnabled").checked = Boolean(item.waf_enabled);
 
+            const abm = Number(item.auto_ban_minutes || 0);
+            if (abm === -1) {
+                document.getElementById("editAutoBanPolicy").value = "-1";
+            } else if (abm > 0) {
+                document.getElementById("editAutoBanPolicy").value = "custom";
+                document.getElementById("editAutoBanCustomMinutes").value = abm;
+            } else {
+                document.getElementById("editAutoBanPolicy").value = "0";
+            }
+            toggleEditAutoBanCustom();
+
             document.getElementById("editDomainModal").classList.remove("hidden");
         }
 
@@ -1303,10 +1486,15 @@
             const status = document.getElementById("editStatus").value;
             const waf_enabled = document.getElementById("editWafEnabled").checked;
 
+            const policySel = document.getElementById("editAutoBanPolicy").value;
+            let auto_ban_minutes = 0;
+            if (policySel === "-1") auto_ban_minutes = -1;
+            else if (policySel === "custom") auto_ban_minutes = Math.max(1, parseInt(document.getElementById("editAutoBanCustomMinutes").value, 10) || 15);
+
             const res = await fetch(`/admin/api/domains/${encodeURIComponent(domain)}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ origin_server, rate_limit, status, waf_enabled })
+                body: JSON.stringify({ origin_server, rate_limit, status, waf_enabled, auto_ban_minutes })
             });
 
             if (handleUnauthorized(res)) return;
@@ -1352,7 +1540,7 @@
             );
         }
 
-        // --- BANNED IPS WITH COUNTDOWN TIMER (ADMIN & USER SCOPED) ---
+        // --- BANNED IPS WITH COUNTDOWN TIMER, PERMANENT BAN & EDIT TIMER ---
         async function loadBannedIps(notify = false) {
             try {
                 const res = await fetch("/admin/api/banned-ips");
@@ -1361,7 +1549,7 @@
                 renderBannedTable();
                 renderLogsTable();
                 renderOverviewLists();
-                if (notify) showToast("Daftar blokir timer diperbarui", "info");
+                if (notify) showToast("Daftar pemblokiran IP diperbarui", "info");
             } catch (err) {
                 console.error(err);
             }
@@ -1369,17 +1557,23 @@
 
         function renderBannedTable() {
             const query = (document.getElementById("searchBannedInput").value || "").toLowerCase();
+            const modeFilter = document.getElementById("filterBanMode").value;
             const tbody = document.getElementById("bannedIpsTableBody");
 
-            const filtered = bannedIpsCache.filter(item =>
-                item.ip_address.toLowerCase().includes(query) ||
-                item.domain.toLowerCase().includes(query) ||
-                item.reason.toLowerCase().includes(query)
-            );
+            const filtered = bannedIpsCache.filter(item => {
+                const matchText = item.ip_address.toLowerCase().includes(query) ||
+                                  item.domain.toLowerCase().includes(query) ||
+                                  item.reason.toLowerCase().includes(query);
+                const isPerm = item.remaining_seconds === null;
+                const matchMode = modeFilter === "all" ||
+                                  (modeFilter === "permanent" && isPerm) ||
+                                  (modeFilter === "temporary" && !isPerm);
+                return matchText && matchMode;
+            });
 
             if (filtered.length === 0) {
                 const emptyText = CURRENT_ROLE === "admin"
-                    ? "Tidak ada IP yang sedang dalam masa blokir timer."
+                    ? "Tidak ada IP yang sedang dalam daftar blokir."
                     : "Tidak ada IP yang sedang diblokir pada domain milik Anda.";
                 tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-500 text-xs">${emptyText}</td></tr>`;
                 return;
@@ -1403,14 +1597,40 @@
                         <td class="py-3.5 px-4">${timerBadge}</td>
                         <td class="py-3.5 px-4 text-slate-400 text-xs font-mono">${escapeHtml(item.unblock_at || "-")}</td>
                         <td class="py-3.5 px-4 text-right">
-                            <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}', '${escapeHtml(item.domain)}')"
-                                class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg text-xs font-bold transition">
-                                Unblokir Sekarang
-                            </button>
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                <button onclick="openEditBanModal('${escapeHtml(item.ip_address)}')"
+                                    class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
+                                    Edit Timer
+                                </button>
+                                <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}', '${escapeHtml(item.domain)}')"
+                                    class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-bold transition">
+                                    Unblokir
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
             }).join("");
+        }
+
+        function toggleManualBanFields() {
+            const banType = document.getElementById("banTypeInput").value;
+            const timerBox = document.getElementById("manualBanTimerBox");
+            const permNotice = document.getElementById("manualBanPermNotice");
+            if (banType === "permanent") {
+                timerBox.classList.add("hidden");
+                permNotice.classList.remove("hidden");
+            } else {
+                timerBox.classList.remove("hidden");
+                permNotice.classList.add("hidden");
+            }
+        }
+
+        function setManualBanPreset(val, unit) {
+            document.getElementById("banTypeInput").value = "temporary";
+            toggleManualBanFields();
+            document.getElementById("banDurationValue").value = val;
+            document.getElementById("banDurationUnit").value = unit;
         }
 
         function openManualBanModal(prefillIp = "", prefillDomain = "") {
@@ -1434,7 +1654,10 @@
             }
 
             document.getElementById("banIpInput").value = prefillIp;
-            document.getElementById("banDurationInput").value = "30";
+            document.getElementById("banTypeInput").value = "temporary";
+            document.getElementById("banDurationValue").value = "30";
+            document.getElementById("banDurationUnit").value = "minutes";
+            toggleManualBanFields();
             document.getElementById("banReasonInput").value = CURRENT_ROLE === "admin"
                 ? "Diblokir Manual oleh Admin"
                 : `Diblokir oleh Pemilik (${CURRENT_USER})`;
@@ -1448,14 +1671,16 @@
         async function submitManualBan(e) {
             e.preventDefault();
             const ip_address = document.getElementById("banIpInput").value.trim();
-            const duration_minutes = parseInt(document.getElementById("banDurationInput").value, 10);
+            const ban_type = document.getElementById("banTypeInput").value;
+            const duration_value = parseInt(document.getElementById("banDurationValue").value, 10) || 30;
+            const duration_unit = document.getElementById("banDurationUnit").value;
             const domain = document.getElementById("banDomainSelect").value;
             const reason = document.getElementById("banReasonInput").value.trim();
 
             const res = await fetch("/admin/api/banned-ips", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ip_address, duration_minutes, domain, reason })
+                body: JSON.stringify({ ip_address, ban_type, duration_value, duration_unit, domain, reason })
             });
 
             if (handleUnauthorized(res)) return;
@@ -1467,6 +1692,84 @@
             } else {
                 const err = await res.json().catch(() => ({}));
                 showToast(err.detail || "Gagal memblokir IP", "error");
+            }
+        }
+
+        // --- EDIT TIMER / PERMANENT BAN MODAL ---
+        function toggleEditBanFields() {
+            const banType = document.getElementById("editBanType").value;
+            const timerBox = document.getElementById("editBanTimerBox");
+            const permNotice = document.getElementById("editBanPermNotice");
+            if (banType === "permanent") {
+                timerBox.classList.add("hidden");
+                permNotice.classList.remove("hidden");
+            } else {
+                timerBox.classList.remove("hidden");
+                permNotice.classList.add("hidden");
+            }
+        }
+
+        function setEditBanPreset(val, unit) {
+            document.getElementById("editBanType").value = "temporary";
+            toggleEditBanFields();
+            document.getElementById("editBanDurationValue").value = val;
+            document.getElementById("editBanDurationUnit").value = unit;
+        }
+
+        function openEditBanModal(ip) {
+            const item = bannedIpsCache.find(b => b.ip_address === ip);
+            if (!item) return;
+
+            document.getElementById("editBanIp").value = item.ip_address;
+            document.getElementById("editBanDomain").value = item.domain;
+            document.getElementById("editBanReason").value = item.reason;
+
+            if (item.remaining_seconds === null) {
+                document.getElementById("editBanType").value = "permanent";
+                document.getElementById("editBanDurationValue").value = 30;
+                document.getElementById("editBanDurationUnit").value = "minutes";
+            } else {
+                document.getElementById("editBanType").value = "temporary";
+                if (item.remaining_seconds < 60) {
+                    document.getElementById("editBanDurationValue").value = Math.max(1, Math.round(item.remaining_seconds));
+                    document.getElementById("editBanDurationUnit").value = "seconds";
+                } else {
+                    document.getElementById("editBanDurationValue").value = Math.max(1, Math.ceil(item.remaining_seconds / 60));
+                    document.getElementById("editBanDurationUnit").value = "minutes";
+                }
+            }
+
+            toggleEditBanFields();
+            document.getElementById("editBanModal").classList.remove("hidden");
+        }
+
+        function closeEditBanModal() {
+            document.getElementById("editBanModal").classList.add("hidden");
+        }
+
+        async function submitEditBan(e) {
+            e.preventDefault();
+            const ip = document.getElementById("editBanIp").value;
+            const ban_type = document.getElementById("editBanType").value;
+            const duration_value = parseInt(document.getElementById("editBanDurationValue").value, 10) || 15;
+            const duration_unit = document.getElementById("editBanDurationUnit").value;
+            const reason = document.getElementById("editBanReason").value.trim();
+
+            const res = await fetch(`/admin/api/banned-ips/${encodeURIComponent(ip)}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ban_type, duration_value, duration_unit, reason })
+            });
+
+            if (handleUnauthorized(res)) return;
+            if (res.ok) {
+                const data = await res.json().catch(() => ({}));
+                closeEditBanModal();
+                showToast(data.message || `Timer blokir untuk ${ip} diperbarui`);
+                await loadBannedIps(false);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast(err.detail || "Gagal memperbarui timer blokir", "error");
             }
         }
 
