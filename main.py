@@ -606,13 +606,23 @@ def delete_domain(target_domain: str, request: Request):
     conn.close()
     return {"message": "Domain dihapus"}
 
-# --- ENDPOINT LOG SERANGAN (LIHAT & HAPUS KHUSUS ADMIN) ---
+# --- ENDPOINT LOG SERANGAN (SCOPED BY ROLE & OWNER) ---
 @app.get("/admin/api/logs")
 def get_attack_logs(request: Request):
-    require_session(request)
+    session = require_session(request)
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, timestamp, ip_address, domain, threat_type FROM attack_logs ORDER BY id DESC LIMIT 100")
+    if session["role"] == "admin":
+        cursor.execute("SELECT id, timestamp, ip_address, domain, threat_type FROM attack_logs ORDER BY id DESC LIMIT 100")
+    else:
+        cursor.execute(
+            q("""SELECT a.id, a.timestamp, a.ip_address, a.domain, a.threat_type
+                 FROM attack_logs a
+                 INNER JOIN clients c ON a.domain = c.domain
+                 WHERE c.owner=?
+                 ORDER BY a.id DESC LIMIT 100"""),
+            (session["username"],)
+        )
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -653,15 +663,23 @@ def clear_all_logs(request: Request):
     conn.close()
     return {"status": "success", "message": "Seluruh log serangan berhasil dibersihkan"}
 
-# --- ENDPOINT KHUSUS ADMIN: DAFTAR, BLOKIR MANUAL & UNBLOKIR IP TIMER ---
+# --- ENDPOINT DAFTAR, BLOKIR MANUAL & UNBLOKIR IP TIMER (ADMIN: SEMUA | USER: DOMAIN SENDIRI) ---
 @app.get("/admin/api/banned-ips")
 def get_banned_ips(request: Request):
     session = require_session(request)
-    if session["role"] != 'admin':
-        raise HTTPException(status_code=403, detail="Hanya admin yang dapat melihat daftar IP terblokir")
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT ip_address, domain, reason, banned_at, banned_until, ban_count FROM banned_ips ORDER BY banned_at DESC")
+    if session["role"] == 'admin':
+        cursor.execute("SELECT ip_address, domain, reason, banned_at, banned_until, ban_count FROM banned_ips ORDER BY banned_at DESC")
+    else:
+        cursor.execute(
+            q("""SELECT b.ip_address, b.domain, b.reason, b.banned_at, b.banned_until, b.ban_count
+                 FROM banned_ips b
+                 INNER JOIN clients c ON b.domain = c.domain
+                 WHERE c.owner=?
+                 ORDER BY b.banned_at DESC"""),
+            (session["username"],)
+        )
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -696,34 +714,63 @@ def get_banned_ips(request: Request):
 @app.post("/admin/api/banned-ips")
 def manual_ban_ip(data: ManualBanData, request: Request):
     session = require_session(request)
-    if session["role"] != 'admin':
-        raise HTTPException(status_code=403, detail="Hanya admin yang dapat memblokir IP")
     clean_ip = data.ip_address.strip()
     if not clean_ip:
         raise HTTPException(status_code=400, detail="Alamat IP tidak boleh kosong")
+
+    target_dom = (data.domain or "").strip()
+    if session["role"] != 'admin':
+        clean_dom = target_dom.lower()
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(q("SELECT 1 FROM clients WHERE domain=? AND owner=?"), (clean_dom, session["username"]))
+        owned = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if not owned:
+            raise HTTPException(status_code=403, detail="Anda hanya dapat memblokir IP pada domain milik Anda sendiri")
+        target_dom = clean_dom
+    else:
+        target_dom = target_dom or "Semua Domain (Manual)"
 
     duration_sec = None
     if data.duration_minutes is not None:
         duration_sec = data.duration_minutes * 60 if data.duration_minutes > 0 else 0
 
+    default_reason = "Diblokir Manual oleh Admin" if session["role"] == "admin" else f"Diblokir oleh Pemilik ({session['username']})"
     ban_info = ban_ip_with_escalation(
         clean_ip,
-        (data.domain or "Semua Domain (Manual)").strip(),
-        (data.reason or "Diblokir Manual oleh Admin").strip(),
+        target_dom,
+        (data.reason or default_reason).strip(),
         custom_duration_seconds=duration_sec
     )
     return {
         "status": "success",
-        "message": f"IP {clean_ip} berhasil diblokir ({ban_info['duration_label']})"
+        "message": f"IP {clean_ip} berhasil diblokir pada {target_dom} ({ban_info['duration_label']})"
     }
 
 @app.delete("/admin/api/banned-ips/{target_ip:path}")
 def unblock_ip(target_ip: str, request: Request):
     session = require_session(request)
-    if session["role"] != 'admin':
-        raise HTTPException(status_code=403, detail="Hanya admin yang dapat membuka blokir IP")
     conn = get_db()
     cursor = conn.cursor()
+
+    if session["role"] != 'admin':
+        cursor.execute(
+            q("""SELECT b.domain FROM banned_ips b
+                 INNER JOIN clients c ON b.domain = c.domain
+                 WHERE b.ip_address=? AND c.owner=?"""),
+            (target_ip, session["username"])
+        )
+        owned_ban = cursor.fetchone()
+        if not owned_ban:
+            cursor.close()
+            conn.close()
+            raise HTTPException(
+                status_code=403,
+                detail="Akses ditolak: Anda hanya dapat membuka blokir IP pada domain milik Anda sendiri"
+            )
+
     cursor.execute(q("DELETE FROM banned_ips WHERE ip_address=?"), (target_ip,))
     conn.commit()
     cursor.close()
@@ -760,24 +807,16 @@ def log_attack(ip: str, domain: str, threat: str):
     conn.close()
 
 def resolve_proxy_target(request: Request, path: str):
-    """
-    Menentukan domain target dan path tujuan:
-    1. Jalur instan eksplisit: /p/<nama_web> atau /p/<nama_web>/sub-halaman
-    2. Permintaan aset/API sub-path (bukan '/'): cek Referer /p/<nama_web> lalu cookie warden_site
-    3. Akses langsung ke '/' atau custom domain penuh: baca dari header Host
-    """
     clean_path = "/" + path.lstrip("/")
     host_header = request.headers.get("host", "").split(":")[0].strip().lower()
 
-    # 1. Jalur instan /p/<nama_web>
     if clean_path == "/p" or clean_path.startswith("/p/"):
-        parts = clean_path.split("/", 3)  # ['', 'p', '<nama_web>', '<sisa_path>']
+        parts = clean_path.split("/", 3)
         if len(parts) >= 3 and parts[2].strip():
             site_name = parts[2].strip().lower()
             forward_path = "/" + parts[3] if len(parts) == 4 else "/"
             return site_name, forward_path, site_name
 
-    # 2. Aset pendukung (/assets/..., /api/..., gambar, CSS/JS) — bukan akses langsung ke '/'
     if clean_path != "/":
         referer = request.headers.get("referer", "")
         if referer:
@@ -791,11 +830,9 @@ def resolve_proxy_target(request: Request, path: str):
         if cookie_site:
             return cookie_site.strip().lower(), clean_path, None
 
-    # 3. Default: gunakan header Host
     return host_header, clean_path, None
 
 def inject_spa_subpath_handler(html_bytes: bytes, site_name: str) -> bytes:
-    """Menyesuaikan router SPA (React/Vue) agar tetap merender '/' sambil menjaga URL /p/<site_name> di browser."""
     html_text = html_bytes.decode("utf-8", errors="replace")
     prefix_json = json.dumps(f"/p/{site_name}")
     prefix_script = f"""<script>
@@ -864,7 +901,6 @@ async def reverse_proxy(request: Request, path: str):
     if not row:
         clean_path = "/" + path.lstrip("/")
         cookie_site = (request.cookies.get("warden_site") or "").strip().lower()
-        # Jika reload mengarah ke '/' namun sesi /p/<nama_web> masih ada, arahkan kembali otomatis
         if clean_path == "/" and cookie_site and not new_site_cookie:
             conn_chk = get_db()
             cur_chk = conn_chk.cursor()

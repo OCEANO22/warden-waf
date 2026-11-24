@@ -103,12 +103,12 @@
                 <span id="badgeLogsCount" class="px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">0</span>
             </button>
 
-            <div id="sidebarSecurityGroup" class="hidden pt-4 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <div class="pt-4 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Network Defense &amp; Access
             </div>
 
             <button onclick="switchView('banned')" id="nav-banned"
-                class="side-nav hidden w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition">
+                class="side-nav w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition">
                 <span class="flex items-center gap-2.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -223,7 +223,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                             </svg>
                             <input type="text" id="heroSearchInput" oninput="handleHeroSearch()"
-                                placeholder="Cari domain proksi, alamat IP penyerang, jenis ancaman, atau user..."
+                                placeholder="Cari domain proksi, alamat IP penyerang, atau jenis ancaman..."
                                 class="w-full bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none">
                             <div class="hidden sm:flex items-center gap-1 ml-2 shrink-0">
                                 <kbd class="px-1.5 py-0.5 text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-700 rounded">Ctrl</kbd>
@@ -302,7 +302,7 @@
                 </div>
             </div>
 
-            <!-- 3-COLUMN SUMMARY GRID -->
+            <!-- 3-COLUMN SUMMARY GRID (VISIBLE FOR BOTH ADMIN & USER) -->
             <div id="overviewColumns" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 <!-- COLUMN 1: DOMAINS -->
@@ -430,15 +430,15 @@
             </div>
         </section>
 
-        <!-- VIEW 3: BANNED IPS WITH COUNTDOWN TIMER (ADMIN ONLY) -->
+        <!-- VIEW 3: BANNED IPS WITH COUNTDOWN TIMER (ADMIN: ALL DOMAINS | USER: OWN DOMAINS) -->
         <section id="view-banned" class="hidden flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-2">
                         <h1 class="text-xl font-extrabold text-white">Blokir IP Berbasis Timer</h1>
-                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">Auto-Escalate</span>
+                        <span id="bannedScopeBadge" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">Auto-Escalate</span>
                     </div>
-                    <p class="text-xs text-slate-400 mt-0.5">
+                    <p id="bannedScopeDesc" class="text-xs text-slate-400 mt-0.5">
                         Pelanggaran ke-1 diblokir <span class="text-slate-200 font-semibold">5 menit</span>, ke-2 <span class="text-slate-200 font-semibold">30 menit</span>, ke-3 <span class="text-slate-200 font-semibold">2 jam</span>, ke-4+ <span class="text-slate-200 font-semibold">24 jam</span>. Otomatis terbuka saat timer habis.
                     </p>
                 </div>
@@ -519,7 +519,7 @@
                                 <th class="py-3.5 px-4">IP Penyerang</th>
                                 <th class="py-3.5 px-4">Domain Target</th>
                                 <th class="py-3.5 px-4">Jenis Ancaman</th>
-                                <th id="logsActionHeader" class="hidden py-3.5 px-4 text-right">Aksi Admin</th>
+                                <th class="py-3.5 px-4 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="logsTableBody" class="divide-y divide-slate-800/80">
@@ -675,7 +675,7 @@
         </div>
     </div>
 
-    <!-- MODAL: BLOKIR IP MANUAL DENGAN TIMER (ADMIN) -->
+    <!-- MODAL: BLOKIR IP MANUAL DENGAN TIMER (ADMIN: SEMUA DOMAIN | USER: DOMAIN SENDIRI) -->
     <div id="manualBanModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
@@ -700,13 +700,14 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Domain Terkait</label>
-                    <input type="text" id="banDomainInput" value="Semua Domain (Manual)"
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Domain Target</label>
+                    <select id="banDomainSelect" required
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500">
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alasan Pemblokiran</label>
-                    <input type="text" id="banReasonInput" value="Diblokir Manual oleh Admin" required
+                    <input type="text" id="banReasonInput" value="Diblokir Manual" required
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
@@ -845,7 +846,7 @@
         }
 
         function switchView(viewName) {
-            if ((viewName === "banned" || viewName === "users") && CURRENT_ROLE !== "admin") return;
+            if (viewName === "users" && CURRENT_ROLE !== "admin") return;
 
             const views = ["overview", "domains", "logs", "banned", "users"];
             const labels = {
@@ -899,6 +900,19 @@
                 });
             });
 
+            bannedIpsCache.filter(b => b.ip_address.toLowerCase().includes(q) || b.domain.toLowerCase().includes(q) || b.reason.toLowerCase().includes(q)).slice(0, 3).forEach(b => {
+                results.push({
+                    category: "Blocked IP",
+                    title: b.ip_address,
+                    subtitle: `${b.domain} • ${b.reason} (${formatCountdown(b.remaining_seconds)})`,
+                    action: () => {
+                        document.getElementById("searchBannedInput").value = b.ip_address;
+                        renderBannedTable();
+                        switchView("banned");
+                    }
+                });
+            });
+
             if (CURRENT_ROLE === "admin") {
                 usersCache.filter(u => u.username.toLowerCase().includes(q) || u.role.toLowerCase().includes(q)).slice(0, 3).forEach(u => {
                     results.push({
@@ -909,19 +923,6 @@
                             document.getElementById("searchUsersInput").value = u.username;
                             renderUsersTable();
                             switchView("users");
-                        }
-                    });
-                });
-
-                bannedIpsCache.filter(b => b.ip_address.toLowerCase().includes(q) || b.reason.toLowerCase().includes(q)).slice(0, 3).forEach(b => {
-                    results.push({
-                        category: "Blocked IP",
-                        title: b.ip_address,
-                        subtitle: `${b.reason} (${formatCountdown(b.remaining_seconds)})`,
-                        action: () => {
-                            document.getElementById("searchBannedInput").value = b.ip_address;
-                            renderBannedTable();
-                            switchView("banned");
                         }
                     });
                 });
@@ -966,25 +967,19 @@
         // --- INITIALIZE DASHBOARD ---
         async function initDashboard() {
             if (CURRENT_ROLE === "admin") {
-                document.getElementById("sidebarSecurityGroup").classList.remove("hidden");
-                document.getElementById("nav-banned").classList.remove("hidden");
                 document.getElementById("nav-users").classList.remove("hidden");
                 document.getElementById("clearAllLogsBtn").classList.remove("hidden");
-                document.getElementById("logsActionHeader").classList.remove("hidden");
-                document.getElementById("overviewBannedCol").classList.remove("hidden");
                 document.getElementById("overviewUsersSection").classList.remove("hidden");
-                document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-3 gap-6";
                 document.getElementById("userNoticeBanner").classList.add("hidden");
+                document.getElementById("bannedScopeBadge").textContent = "Semua Domain";
             } else {
-                document.getElementById("sidebarSecurityGroup").classList.add("hidden");
-                document.getElementById("nav-banned").classList.add("hidden");
                 document.getElementById("nav-users").classList.add("hidden");
                 document.getElementById("clearAllLogsBtn").classList.add("hidden");
-                document.getElementById("logsActionHeader").classList.add("hidden");
-                document.getElementById("overviewBannedCol").classList.add("hidden");
                 document.getElementById("overviewUsersSection").classList.add("hidden");
-                document.getElementById("overviewColumns").className = "grid grid-cols-1 lg:grid-cols-2 gap-6";
                 document.getElementById("userNoticeBanner").classList.remove("hidden");
+                document.getElementById("bannedScopeBadge").textContent = "Domain Milik Anda";
+                document.getElementById("bannedScopeDesc").innerHTML =
+                    `Menampilkan IP yang diblokir pada <span class="text-slate-200 font-semibold">domain milik Anda sendiri</span>. Pelanggaran ke-1 diblokir 5 menit, ke-2 30 menit, ke-3 2 jam, ke-4+ 24 jam, dan Anda dapat membuka blokir khusus domain Anda.`;
             }
 
             await syncAllData(false);
@@ -997,7 +992,7 @@
             await Promise.all([
                 loadDomains(false),
                 loadLogs(false),
-                CURRENT_ROLE === "admin" ? loadBannedIps(false) : Promise.resolve(),
+                loadBannedIps(false),
                 CURRENT_ROLE === "admin" ? loadUsers(false) : Promise.resolve()
             ]);
 
@@ -1048,7 +1043,7 @@
                         class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-800/40 rounded-lg transition group">
                         <div class="min-w-0">
                             <div class="text-xs font-mono font-semibold text-rose-400 group-hover:text-rose-300 truncate">${escapeHtml(b.ip_address)}</div>
-                            <div class="text-[11px] text-slate-400 truncate">${escapeHtml(b.reason)} (Ke-${Number(b.ban_count || 1)})</div>
+                            <div class="text-[11px] text-slate-400 truncate">${escapeHtml(b.domain)} &bull; ${escapeHtml(b.reason)} (Ke-${Number(b.ban_count || 1)})</div>
                         </div>
                         <span class="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-[11px] font-mono text-rose-300 shrink-0 ml-2">
                             ${escapeHtml(formatCountdown(b.remaining_seconds))}
@@ -1357,10 +1352,8 @@
             );
         }
 
-        // --- BANNED IPS WITH COUNTDOWN TIMER (ADMIN) ---
+        // --- BANNED IPS WITH COUNTDOWN TIMER (ADMIN & USER SCOPED) ---
         async function loadBannedIps(notify = false) {
-            if (CURRENT_ROLE !== "admin") return;
-
             try {
                 const res = await fetch("/admin/api/banned-ips");
                 if (handleUnauthorized(res) || !res.ok) return;
@@ -1385,7 +1378,10 @@
             );
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="py-10 text-center text-slate-500 text-xs">Tidak ada IP yang sedang dalam masa blokir timer.</td></tr>';
+                const emptyText = CURRENT_ROLE === "admin"
+                    ? "Tidak ada IP yang sedang dalam masa blokir timer."
+                    : "Tidak ada IP yang sedang diblokir pada domain milik Anda.";
+                tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-500 text-xs">${emptyText}</td></tr>`;
                 return;
             }
 
@@ -1407,7 +1403,7 @@
                         <td class="py-3.5 px-4">${timerBadge}</td>
                         <td class="py-3.5 px-4 text-slate-400 text-xs font-mono">${escapeHtml(item.unblock_at || "-")}</td>
                         <td class="py-3.5 px-4 text-right">
-                            <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}')"
+                            <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}', '${escapeHtml(item.domain)}')"
                                 class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg text-xs font-bold transition">
                                 Unblokir Sekarang
                             </button>
@@ -1417,11 +1413,31 @@
             }).join("");
         }
 
-        function openManualBanModal(prefillIp = "", prefillDomain = "Semua Domain (Manual)") {
+        function openManualBanModal(prefillIp = "", prefillDomain = "") {
+            const domainSelect = document.getElementById("banDomainSelect");
+            if (CURRENT_ROLE !== "admin" && domainsCache.length === 0) {
+                showToast("Daftarkan minimal 1 domain milik Anda terlebih dahulu", "error");
+                return;
+            }
+
+            let optionsHtml = "";
+            if (CURRENT_ROLE === "admin") {
+                optionsHtml += `<option value="Semua Domain (Manual)">Semua Domain (Manual)</option>`;
+            }
+            domainsCache.forEach(d => {
+                optionsHtml += `<option value="${escapeHtml(d.domain)}">${escapeHtml(d.domain)}</option>`;
+            });
+            domainSelect.innerHTML = optionsHtml;
+
+            if (prefillDomain && Array.from(domainSelect.options).some(o => o.value === prefillDomain)) {
+                domainSelect.value = prefillDomain;
+            }
+
             document.getElementById("banIpInput").value = prefillIp;
             document.getElementById("banDurationInput").value = "30";
-            document.getElementById("banDomainInput").value = prefillDomain;
-            document.getElementById("banReasonInput").value = "Diblokir Manual oleh Admin";
+            document.getElementById("banReasonInput").value = CURRENT_ROLE === "admin"
+                ? "Diblokir Manual oleh Admin"
+                : `Diblokir oleh Pemilik (${CURRENT_USER})`;
             document.getElementById("manualBanModal").classList.remove("hidden");
         }
 
@@ -1433,7 +1449,7 @@
             e.preventDefault();
             const ip_address = document.getElementById("banIpInput").value.trim();
             const duration_minutes = parseInt(document.getElementById("banDurationInput").value, 10);
-            const domain = document.getElementById("banDomainInput").value.trim();
+            const domain = document.getElementById("banDomainSelect").value;
             const reason = document.getElementById("banReasonInput").value.trim();
 
             const res = await fetch("/admin/api/banned-ips", {
@@ -1449,14 +1465,16 @@
                 showToast(data.message || `IP ${ip_address} berhasil diblokir`);
                 await loadBannedIps(false);
             } else {
-                showToast("Gagal memblokir IP", "error");
+                const err = await res.json().catch(() => ({}));
+                showToast(err.detail || "Gagal memblokir IP", "error");
             }
         }
 
-        function confirmUnblockIp(ip) {
+        function confirmUnblockIp(ip, domainName = "") {
+            const domainInfo = domainName ? ` pada domain ${domainName}` : "";
             openConfirmModal(
                 "Buka Blokir IP & Reset Riwayat",
-                `Izinkan kembali alamat IP ${ip} sekarang? Riwayat jumlah pelanggaran untuk IP ini juga akan direset.`,
+                `Izinkan kembali alamat IP ${ip}${domainInfo} sekarang? Riwayat jumlah pelanggaran untuk IP ini juga akan direset.`,
                 "Ya, Unblokir IP",
                 async () => {
                     const res = await fetch(`/admin/api/banned-ips/${encodeURIComponent(ip)}`, {
@@ -1509,21 +1527,13 @@
 
             tbody.innerHTML = filtered.map(l => {
                 const isAlreadyBanned = bannedSet.has(l.ip_address);
-                const adminActions = CURRENT_ROLE === "admin"
-                    ? `
-                        <td class="py-3.5 px-4 text-right">
-                            <div class="inline-flex items-center justify-end gap-1.5">
-                                ${!isAlreadyBanned
-                                    ? `<button onclick="openManualBanModal('${escapeHtml(l.ip_address)}', '${escapeHtml(l.domain)}')" class="bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Blokir IP</button>`
-                                    : `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[11px] font-medium">Sedang Diblokir</span>`
-                                }
-                                <button onclick="deleteSingleLog(${Number(l.id)})" class="bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
-                                    Hapus
-                                </button>
-                            </div>
-                        </td>
-                    `
+                const deleteLogBtn = CURRENT_ROLE === "admin"
+                    ? `<button onclick="deleteSingleLog(${Number(l.id)})" class="bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Hapus</button>`
                     : "";
+
+                const banBtn = !isAlreadyBanned
+                    ? `<button onclick="openManualBanModal('${escapeHtml(l.ip_address)}', '${escapeHtml(l.domain)}')" class="bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Blokir IP</button>`
+                    : `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[11px] font-medium">Sedang Diblokir</span>`;
 
                 return `
                     <tr class="hover:bg-slate-800/40 transition">
@@ -1531,7 +1541,12 @@
                         <td class="py-3.5 px-4 font-mono text-xs font-bold text-white">${escapeHtml(l.ip_address)}</td>
                         <td class="py-3.5 px-4 text-slate-300 font-medium">${escapeHtml(l.domain)}</td>
                         <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">${escapeHtml(l.threat_type)}</span></td>
-                        ${adminActions}
+                        <td class="py-3.5 px-4 text-right">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                ${banBtn}
+                                ${deleteLogBtn}
+                            </div>
+                        </td>
                     </tr>
                 `;
             }).join("");
@@ -1572,9 +1587,9 @@
             );
         }
 
-        // LIVE COUNTDOWN TICKER EVERY 1 SECOND
+        // LIVE COUNTDOWN TICKER EVERY 1 SECOND (ADMIN & USER)
         function tickBanCountdowns() {
-            if (CURRENT_ROLE !== "admin" || bannedIpsCache.length === 0) return;
+            if (bannedIpsCache.length === 0) return;
             let anyExpired = false;
             bannedIpsCache.forEach(item => {
                 if (typeof item.remaining_seconds === "number") {
