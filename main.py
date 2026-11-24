@@ -26,6 +26,7 @@ WAF_SECRET = os.getenv("WAF_SECRET", "warden-waf-enterprise-secret-2026")
 # --- KONFIGURASI DURASI BLOKIR BERTINGKAT (DETIK) ---
 # Pelanggaran ke-1: 5 menit | ke-2: 30 menit | ke-3: 2 jam | ke-4+: 24 jam
 BAN_ESCALATION_SECONDS = [300, 1800, 7200, 86400]
+TIME_WINDOW = 10
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -41,10 +42,11 @@ def q(query: str) -> str:
     return query.replace("?", "%s") if USE_POSTGRES else query
 
 def get_client_ip(request: Request) -> str:
-    """Mengambil IP asli pengunjung meskipun melewati load balancer Render."""
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+    """Mengambil IP asli pengunjung meskipun melewati CDN (Cloudflare) atau load balancer Render."""
+    for header in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
+        val = request.headers.get(header)
+        if val:
+            return val.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 def format_duration_id(seconds: int) -> str:
@@ -96,6 +98,11 @@ def init_db():
             banned_until DOUBLE PRECISION,
             ban_count INTEGER NOT NULL DEFAULT 1
         )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS rate_limit_hits (
+            id SERIAL PRIMARY KEY,
+            ip_address TEXT NOT NULL,
+            hit_time DOUBLE PRECISION NOT NULL
+        )''')
         cursor.execute("ALTER TABLE banned_ips ADD COLUMN IF NOT EXISTS banned_until DOUBLE PRECISION")
         cursor.execute("ALTER TABLE banned_ips ADD COLUMN IF NOT EXISTS ban_count INTEGER NOT NULL DEFAULT 1")
     else:
@@ -128,6 +135,11 @@ def init_db():
             banned_at TEXT NOT NULL,
             banned_until REAL,
             ban_count INTEGER NOT NULL DEFAULT 1
+        )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS rate_limit_hits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip_address TEXT NOT NULL,
+            hit_time REAL NOT NULL
         )''')
         for alter_sql in [
             "ALTER TABLE banned_ips ADD COLUMN banned_until REAL",
@@ -242,7 +254,6 @@ def is_ip_banned(ip: str) -> Optional[dict]:
             "unblock_at": unblock_str
         }
 
-    REQUEST_LOGS.pop(ip, None)
     return None
 
 def ban_ip_with_escalation(ip: str, domain: str, reason: str, custom_duration_seconds: Optional[int] = None) -> dict:
@@ -292,10 +303,10 @@ def ban_ip_with_escalation(ip: str, domain: str, reason: str, custom_duration_se
             "INSERT OR REPLACE INTO banned_ips (ip_address, domain, reason, banned_at, banned_until, ban_count) VALUES (?, ?, ?, ?, ?, ?)",
             (ip, domain, reason, now_str, banned_until, new_count)
         )
+    cursor.execute(q("DELETE FROM rate_limit_hits WHERE ip_address=?"), (ip,))
     conn.commit()
     cursor.close()
     conn.close()
-    REQUEST_LOGS.pop(ip, None)
 
     return {
         "ban_count": new_count,
@@ -303,6 +314,32 @@ def ban_ip_with_escalation(ip: str, domain: str, reason: str, custom_duration_se
         "remaining_seconds": remaining_seconds,
         "unblock_at_str": unblock_at_str
     }
+
+def check_and_record_rate_limit(ip: str, limit: int) -> bool:
+    """
+    Mencatat permintaan di database agar konsisten di seluruh worker.
+    Mengembalikan True jika jumlah request dalam TIME_WINDOW sudah mencapai batas.
+    """
+    now = time.time()
+    window_start = now - TIME_WINDOW
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(q("DELETE FROM rate_limit_hits WHERE hit_time < ?"), (window_start,))
+    cursor.execute(q("SELECT COUNT(*) FROM rate_limit_hits WHERE ip_address=?"), (ip,))
+    count = cursor.fetchone()[0] or 0
+
+    if count >= limit:
+        cursor.execute(q("DELETE FROM rate_limit_hits WHERE ip_address=?"), (ip,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+
+    cursor.execute(q("INSERT INTO rate_limit_hits (ip_address, hit_time) VALUES (?, ?)"), (ip, now))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return False
 
 # --- FUNGSI HELPER JS CHALLENGE ---
 def sign_challenge(ts: str, a: int, b: int, ans: int) -> str:
@@ -663,7 +700,7 @@ def clear_all_logs(request: Request):
     conn.close()
     return {"status": "success", "message": "Seluruh log serangan berhasil dibersihkan"}
 
-# --- ENDPOINT DAFTAR, BLOKIR MANUAL & UNBLOKIR IP TIMER (ADMIN: SEMUA | USER: DOMAIN SENDIRI) ---
+# --- ENDPOINT DAFTAR, BLOKIR MANUAL & UNBLOKIR IP TIMER ---
 @app.get("/admin/api/banned-ips")
 def get_banned_ips(request: Request):
     session = require_session(request)
@@ -772,15 +809,13 @@ def unblock_ip(target_ip: str, request: Request):
             )
 
     cursor.execute(q("DELETE FROM banned_ips WHERE ip_address=?"), (target_ip,))
+    cursor.execute(q("DELETE FROM rate_limit_hits WHERE ip_address=?"), (target_ip,))
     conn.commit()
     cursor.close()
     conn.close()
-    REQUEST_LOGS.pop(target_ip, None)
     return {"status": "success", "message": f"Blokir untuk IP {target_ip} berhasil dibuka & riwayat pelanggaran direset"}
 
 # --- ENGINE KEAMANAN (WAF & RATE LIMIT) ---
-TIME_WINDOW = 10 
-REQUEST_LOGS = {}
 WAF_PATTERNS = [
     r"(\%27)|(\')",
     r"((\%3D)|(=))[^\n]*(\%27|\')",
@@ -958,11 +993,8 @@ async def reverse_proxy(request: Request, path: str):
             }
         )
 
-    # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR TIMER BERTINGKAT
-    current_time = time.time()
-    REQUEST_LOGS.setdefault(client_ip, [])
-    REQUEST_LOGS[client_ip] = [t for t in REQUEST_LOGS[client_ip] if current_time - t < TIME_WINDOW]
-    if len(REQUEST_LOGS[client_ip]) >= client_config["rate_limit"]:
+    # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR TIMER BERTINGKAT (TERCATAT DI DB)
+    if check_and_record_rate_limit(client_ip, client_config["rate_limit"]):
         ban_info = ban_ip_with_escalation(client_ip, target_domain, "DDoS / Flood Rate Limit")
         log_attack(client_ip, target_domain, f"DDoS / Flood Rate Limit (Pelanggaran #{ban_info['ban_count']} - {ban_info['duration_label']})")
         return JSONResponse(
@@ -978,8 +1010,6 @@ async def reverse_proxy(request: Request, path: str):
                 "reason": f"Terlalu banyak permintaan / DDoS Flood (Pelanggaran ke-{ban_info['ban_count']}). IP diblokir selama {ban_info['duration_label']}."
             }
         )
-
-    REQUEST_LOGS[client_ip].append(current_time)
 
     # 4. HALAMAN VERIFIKASI BROWSER (JS CHALLENGE)
     if client_config["waf_enabled"]:
