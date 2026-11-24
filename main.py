@@ -23,6 +23,10 @@ DB_FILE = "waf_database.db"
 DATABASE_URL = os.getenv("DATABASE_URL")
 WAF_SECRET = os.getenv("WAF_SECRET", "warden-waf-enterprise-secret-2026")
 
+# --- KONFIGURASI DURASI BLOKIR BERTINGKAT (DETIK) ---
+# Pelanggaran ke-1: 5 menit | ke-2: 30 menit | ke-3: 2 jam | ke-4+: 24 jam
+BAN_ESCALATION_SECONDS = [300, 1800, 7200, 86400]
+
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -43,7 +47,21 @@ def get_client_ip(request: Request) -> str:
         return forwarded_for.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
-# --- 1. SETUP DATABASE ---
+def format_duration_id(seconds: int) -> str:
+    """Mengubah detik menjadi teks durasi yang mudah dibaca (misal: 5 menit, 2 jam 10 menit)."""
+    seconds = max(1, int(seconds))
+    hours, rem = divmod(seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours} jam")
+    if minutes > 0:
+        parts.append(f"{minutes} menit")
+    if secs > 0 and hours == 0:
+        parts.append(f"{secs} detik")
+    return " ".join(parts) if parts else "1 detik"
+
+# --- 1. SETUP & MIGRASI DATABASE ---
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
@@ -74,8 +92,13 @@ def init_db():
             ip_address TEXT PRIMARY KEY,
             domain TEXT NOT NULL,
             reason TEXT NOT NULL,
-            banned_at TEXT NOT NULL
+            banned_at TEXT NOT NULL,
+            banned_until DOUBLE PRECISION,
+            ban_count INTEGER NOT NULL DEFAULT 1
         )''')
+        # Migrasi aman jika tabel banned_ips lama sudah ada di PostgreSQL
+        cursor.execute("ALTER TABLE banned_ips ADD COLUMN IF NOT EXISTS banned_until DOUBLE PRECISION")
+        cursor.execute("ALTER TABLE banned_ips ADD COLUMN IF NOT EXISTS ban_count INTEGER NOT NULL DEFAULT 1")
     else:
         cursor.execute('''CREATE TABLE IF NOT EXISTS clients (
             domain TEXT PRIMARY KEY,
@@ -103,8 +126,19 @@ def init_db():
             ip_address TEXT PRIMARY KEY,
             domain TEXT NOT NULL,
             reason TEXT NOT NULL,
-            banned_at TEXT NOT NULL
+            banned_at TEXT NOT NULL,
+            banned_until REAL,
+            ban_count INTEGER NOT NULL DEFAULT 1
         )''')
+        # Migrasi aman jika tabel banned_ips lama sudah ada di SQLite
+        for alter_sql in [
+            "ALTER TABLE banned_ips ADD COLUMN banned_until REAL",
+            "ALTER TABLE banned_ips ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 1"
+        ]:
+            try:
+                cursor.execute(alter_sql)
+            except sqlite3.OperationalError:
+                pass
     conn.commit()
     cursor.close()
     conn.close()
@@ -128,6 +162,7 @@ class ManualBanData(BaseModel):
     ip_address: str
     domain: Optional[str] = "Semua Domain (Manual)"
     reason: Optional[str] = "Diblokir Manual oleh Admin"
+    duration_minutes: Optional[int] = 30  # None atau <= 0 berarti permanen
 
 class AuthData(BaseModel):
     username: str
@@ -177,38 +212,111 @@ def require_session(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Sesi tidak valid atau telah berakhir. Silakan login kembali.")
     return session
 
-# --- FUNGSI HELPER PEMBLOKIRAN PERMANEN ---
-def is_ip_banned(ip: str) -> Optional[str]:
+# --- FUNGSI HELPER PEMBLOKIRAN TIMER & ESKALASI BERTINGKAT ---
+def is_ip_banned(ip: str) -> Optional[dict]:
+    """
+    Memeriksa apakah IP sedang dalam masa blokir.
+    Jika timer sudah habis, IP otomatis diizinkan masuk kembali, namun catatan
+    ban_count tetap disimpan agar pelanggaran berikutnya mendapat durasi lebih lama.
+    """
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(q("SELECT reason FROM banned_ips WHERE ip_address=?"), (ip,))
+    cursor.execute(q("SELECT reason, banned_until, ban_count FROM banned_ips WHERE ip_address=?"), (ip,))
     row = cursor.fetchone()
     cursor.close()
     conn.close()
-    return row[0] if row else None
 
-def ban_ip_permanently(ip: str, domain: str, reason: str):
+    if not row:
+        return None
+
+    reason, banned_until, ban_count = row[0], row[1], row[2] or 1
+    if banned_until is None:
+        return {
+            "reason": reason,
+            "remaining_seconds": None,
+            "ban_count": ban_count,
+            "unblock_at": "Permanen"
+        }
+
+    now = time.time()
+    if now < float(banned_until):
+        remaining = max(1, int(float(banned_until) - now))
+        unblock_str = datetime.fromtimestamp(float(banned_until)).strftime("%Y-%m-%d %H:%M:%S")
+        return {
+            "reason": reason,
+            "remaining_seconds": remaining,
+            "ban_count": ban_count,
+            "unblock_at": unblock_str
+        }
+
+    # Timer sudah habis -> otomatis terbuka, bersihkan log rate-limit lama
+    REQUEST_LOGS.pop(ip, None)
+    return None
+
+def ban_ip_with_escalation(ip: str, domain: str, reason: str, custom_duration_seconds: Optional[int] = None) -> dict:
+    """
+    Memblokir IP dengan timer bertingkat berdasarkan riwayat pelanggaran sebelumnya.
+    Jika custom_duration_seconds diberikan:
+      - > 0 : pakai durasi khusus (misal dari input manual admin)
+      - <= 0: blokir permanen (banned_until = NULL)
+    """
     conn = get_db()
     cursor = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute(q("SELECT ban_count FROM banned_ips WHERE ip_address=?"), (ip,))
+    existing = cursor.fetchone()
+
+    prev_count = (existing[0] or 0) if existing else 0
+    new_count = prev_count + 1
+    now_ts = time.time()
+    now_str = datetime.fromtimestamp(now_ts).strftime("%Y-%m-%d %H:%M:%S")
+
+    if custom_duration_seconds is not None:
+        if custom_duration_seconds <= 0:
+            banned_until = None
+            duration_label = "Permanen"
+            remaining_seconds = None
+            unblock_at_str = "Permanen"
+        else:
+            banned_until = now_ts + custom_duration_seconds
+            duration_label = format_duration_id(custom_duration_seconds)
+            remaining_seconds = custom_duration_seconds
+            unblock_at_str = datetime.fromtimestamp(banned_until).strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        tier_idx = min(new_count - 1, len(BAN_ESCALATION_SECONDS) - 1)
+        duration_sec = BAN_ESCALATION_SECONDS[tier_idx]
+        banned_until = now_ts + duration_sec
+        duration_label = format_duration_id(duration_sec)
+        remaining_seconds = duration_sec
+        unblock_at_str = datetime.fromtimestamp(banned_until).strftime("%Y-%m-%d %H:%M:%S")
+
     if USE_POSTGRES:
         cursor.execute(
-            """INSERT INTO banned_ips (ip_address, domain, reason, banned_at)
-               VALUES (%s, %s, %s, %s)
+            """INSERT INTO banned_ips (ip_address, domain, reason, banned_at, banned_until, ban_count)
+               VALUES (%s, %s, %s, %s, %s, %s)
                ON CONFLICT (ip_address) DO UPDATE SET
                    domain = EXCLUDED.domain,
                    reason = EXCLUDED.reason,
-                   banned_at = EXCLUDED.banned_at""",
-            (ip, domain, reason, now)
+                   banned_at = EXCLUDED.banned_at,
+                   banned_until = EXCLUDED.banned_until,
+                   ban_count = EXCLUDED.ban_count""",
+            (ip, domain, reason, now_str, banned_until, new_count)
         )
     else:
         cursor.execute(
-            "INSERT OR REPLACE INTO banned_ips (ip_address, domain, reason, banned_at) VALUES (?, ?, ?, ?)",
-            (ip, domain, reason, now)
+            "INSERT OR REPLACE INTO banned_ips (ip_address, domain, reason, banned_at, banned_until, ban_count) VALUES (?, ?, ?, ?, ?, ?)",
+            (ip, domain, reason, now_str, banned_until, new_count)
         )
     conn.commit()
     cursor.close()
     conn.close()
+    REQUEST_LOGS.pop(ip, None)
+
+    return {
+        "ban_count": new_count,
+        "duration_label": duration_label,
+        "remaining_seconds": remaining_seconds,
+        "unblock_at_str": unblock_at_str
+    }
 
 # --- FUNGSI HELPER JS CHALLENGE ---
 def sign_challenge(ts: str, a: int, b: int, ans: int) -> str:
@@ -262,8 +370,14 @@ async def dashboard_ui(request: Request):
 @app.post("/__waf_verify")
 async def verify_js_challenge(data: ChallengeVerifyData, request: Request):
     client_ip = get_client_ip(request)
-    if is_ip_banned(client_ip):
-        raise HTTPException(status_code=403, detail="IP Anda diblokir permanen oleh WardenWAF.")
+    active_ban = is_ip_banned(client_ip)
+    if active_ban:
+        rem = active_ban["remaining_seconds"]
+        sisa_str = format_duration_id(rem) if rem else "Permanen"
+        raise HTTPException(
+            status_code=403,
+            detail=f"IP Anda sedang diblokir sementara karena {active_ban['reason']} (Sisa waktu: {sisa_str})."
+        )
 
     try:
         if abs(int(time.time()) - int(data.ts)) > 300:
@@ -553,7 +667,7 @@ def clear_all_logs(request: Request):
     conn.close()
     return {"status": "success", "message": "Seluruh log serangan berhasil dibersihkan"}
 
-# --- ENDPOINT KHUSUS ADMIN: DAFTAR, BLOKIR MANUAL & UNBLOKIR IP PERMANEN ---
+# --- ENDPOINT KHUSUS ADMIN: DAFTAR, BLOKIR MANUAL & UNBLOKIR IP TIMER ---
 @app.get("/admin/api/banned-ips")
 def get_banned_ips(request: Request):
     session = require_session(request)
@@ -561,19 +675,37 @@ def get_banned_ips(request: Request):
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat melihat daftar IP terblokir")
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT ip_address, domain, reason, banned_at FROM banned_ips ORDER BY banned_at DESC")
+    cursor.execute("SELECT ip_address, domain, reason, banned_at, banned_until, ban_count FROM banned_ips ORDER BY banned_at DESC")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return [
-        {
-            "ip_address": r[0],
-            "domain": r[1],
-            "reason": r[2],
-            "banned_at": r[3]
-        }
-        for r in rows
-    ]
+
+    now = time.time()
+    active_bans = []
+    for r in rows:
+        ip_addr, dom, rsn, b_at, b_until, b_count = r[0], r[1], r[2], r[3], r[4], r[5] or 1
+        if b_until is None:
+            active_bans.append({
+                "ip_address": ip_addr,
+                "domain": dom,
+                "reason": rsn,
+                "banned_at": b_at,
+                "unblock_at": "Permanen",
+                "remaining_seconds": None,
+                "ban_count": b_count
+            })
+        elif now < float(b_until):
+            rem = max(1, int(float(b_until) - now))
+            active_bans.append({
+                "ip_address": ip_addr,
+                "domain": dom,
+                "reason": rsn,
+                "banned_at": b_at,
+                "unblock_at": datetime.fromtimestamp(float(b_until)).strftime("%Y-%m-%d %H:%M:%S"),
+                "remaining_seconds": rem,
+                "ban_count": b_count
+            })
+    return active_bans
 
 @app.post("/admin/api/banned-ips")
 def manual_ban_ip(data: ManualBanData, request: Request):
@@ -583,12 +715,21 @@ def manual_ban_ip(data: ManualBanData, request: Request):
     clean_ip = data.ip_address.strip()
     if not clean_ip:
         raise HTTPException(status_code=400, detail="Alamat IP tidak boleh kosong")
-    ban_ip_permanently(
+
+    duration_sec = None
+    if data.duration_minutes is not None:
+        duration_sec = data.duration_minutes * 60 if data.duration_minutes > 0 else 0
+
+    ban_info = ban_ip_with_escalation(
         clean_ip,
         (data.domain or "Semua Domain (Manual)").strip(),
-        (data.reason or "Diblokir Manual oleh Admin").strip()
+        (data.reason or "Diblokir Manual oleh Admin").strip(),
+        custom_duration_seconds=duration_sec
     )
-    return {"status": "success", "message": f"IP {clean_ip} berhasil diblokir permanen"}
+    return {
+        "status": "success",
+        "message": f"IP {clean_ip} berhasil diblokir ({ban_info['duration_label']})"
+    }
 
 @app.delete("/admin/api/banned-ips/{target_ip:path}")
 def unblock_ip(target_ip: str, request: Request):
@@ -597,12 +738,13 @@ def unblock_ip(target_ip: str, request: Request):
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat membuka blokir IP")
     conn = get_db()
     cursor = conn.cursor()
+    # Unblokir manual oleh admin menghapus catatan pelanggaran sepenuhnya
     cursor.execute(q("DELETE FROM banned_ips WHERE ip_address=?"), (target_ip,))
     conn.commit()
     cursor.close()
     conn.close()
     REQUEST_LOGS.pop(target_ip, None)
-    return {"status": "success", "message": f"Blokir untuk IP {target_ip} berhasil dibuka"}
+    return {"status": "success", "message": f"Blokir untuk IP {target_ip} berhasil dibuka & riwayat pelanggaran direset"}
 
 # --- ENGINE KEAMANAN (WAF & RATE LIMIT) ---
 TIME_WINDOW = 10 
@@ -731,32 +873,63 @@ async def reverse_proxy(request: Request, path: str):
     if client_config["status"] == "pending":
         return JSONResponse(status_code=403, content={"error": "Domain ini sedang menunggu persetujuan Admin."})
 
-    # 1. CEK APAKAH IP SUDAH TERBLOKIR PERMANEN DI DATABASE
-    banned_reason = is_ip_banned(client_ip)
-    if banned_reason:
+    # 1. CEK APAKAH IP SEDANG DALAM MASA BLOKIR TIMER
+    active_ban = is_ip_banned(client_ip)
+    if active_ban:
+        rem = active_ban["remaining_seconds"]
+        headers = {"Retry-After": str(rem)} if rem else {}
+        sisa_str = format_duration_id(rem) if rem else "Permanen"
         return JSONResponse(
             status_code=403,
+            headers=headers,
             content={
                 "status": "blocked",
                 "firewall": "WardenWAF",
-                "reason": f"IP Anda ({client_ip}) diblokir permanen karena {banned_reason}."
+                "offense_count": active_ban["ban_count"],
+                "remaining_seconds": rem,
+                "unblock_at": active_ban["unblock_at"],
+                "reason": f"IP Anda ({client_ip}) diblokir sementara karena {active_ban['reason']}. Otomatis dibuka dalam {sisa_str}."
             }
         )
 
-    # 2. DETEKSI SERANGAN SQL INJECTION / XSS -> BLOKIR PERMANEN
+    # 2. DETEKSI SERANGAN SQL INJECTION / XSS -> BLOKIR TIMER BERTINGKAT
     if client_config["waf_enabled"] and is_malicious(str(request.url)):
-        ban_ip_permanently(client_ip, target_domain, "SQLi/XSS Injection")
-        log_attack(client_ip, target_domain, "SQLi/XSS Injection")
-        return JSONResponse(status_code=403, content={"status": "blocked", "firewall": "WardenWAF", "reason": "Malicious payload detected - IP Banned Permanently"})
+        ban_info = ban_ip_with_escalation(client_ip, target_domain, "SQLi/XSS Injection")
+        log_attack(client_ip, target_domain, f"SQLi/XSS Injection (Pelanggaran #{ban_info['ban_count']} - {ban_info['duration_label']})")
+        return JSONResponse(
+            status_code=403,
+            headers={"Retry-After": str(ban_info["remaining_seconds"])},
+            content={
+                "status": "blocked",
+                "firewall": "WardenWAF",
+                "offense_count": ban_info["ban_count"],
+                "ban_duration": ban_info["duration_label"],
+                "remaining_seconds": ban_info["remaining_seconds"],
+                "unblock_at": ban_info["unblock_at_str"],
+                "reason": f"Serangan SQLi/XSS terdeteksi (Pelanggaran ke-{ban_info['ban_count']}). IP diblokir selama {ban_info['duration_label']}."
+            }
+        )
 
-    # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR PERMANEN
+    # 3. DETEKSI FLOOD / DDOS RATE LIMIT -> BLOKIR TIMER BERTINGKAT
     current_time = time.time()
     REQUEST_LOGS.setdefault(client_ip, [])
     REQUEST_LOGS[client_ip] = [t for t in REQUEST_LOGS[client_ip] if current_time - t < TIME_WINDOW]
     if len(REQUEST_LOGS[client_ip]) >= client_config["rate_limit"]:
-        ban_ip_permanently(client_ip, target_domain, "DDoS / Flood Rate Limit")
-        log_attack(client_ip, target_domain, "DDoS / Flood Rate Limit")
-        return JSONResponse(status_code=429, content={"status": "blocked", "firewall": "WardenWAF", "reason": "Too many requests - IP Banned Permanently"})
+        ban_info = ban_ip_with_escalation(client_ip, target_domain, "DDoS / Flood Rate Limit")
+        log_attack(client_ip, target_domain, f"DDoS / Flood Rate Limit (Pelanggaran #{ban_info['ban_count']} - {ban_info['duration_label']})")
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(ban_info["remaining_seconds"])},
+            content={
+                "status": "blocked",
+                "firewall": "WardenWAF",
+                "offense_count": ban_info["ban_count"],
+                "ban_duration": ban_info["duration_label"],
+                "remaining_seconds": ban_info["remaining_seconds"],
+                "unblock_at": ban_info["unblock_at_str"],
+                "reason": f"Terlalu banyak permintaan / DDoS Flood (Pelanggaran ke-{ban_info['ban_count']}). IP diblokir selama {ban_info['duration_label']}."
+            }
+        )
 
     REQUEST_LOGS[client_ip].append(current_time)
 

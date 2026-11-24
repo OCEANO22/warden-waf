@@ -10,7 +10,6 @@
         body { font-family: 'Inter', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-        /* Latar belakang gelap selaras halaman login dengan pola kisi & titik node jaringan */
         .bg-network-grid {
             background-color: #020617;
             background-image:
@@ -37,7 +36,7 @@
 
     <!-- LEFT SIDEBAR -->
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900/95 backdrop-blur-md border-r border-slate-800 flex flex-col transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-200 ease-in-out">
-        <!-- BRAND HEADER (SELARAS HALAMAN LOGIN) -->
+        <!-- BRAND HEADER -->
         <div class="h-14 px-4 border-b border-slate-800 flex items-center justify-between">
             <button onclick="switchView('overview')" class="flex items-center gap-2.5 text-left group focus:outline-none">
                 <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-sm">
@@ -112,9 +111,9 @@
                 class="side-nav hidden w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-slate-800/60 hover:text-slate-100 border border-transparent transition">
                 <span class="flex items-center gap-2.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Blokir IP Permanen</span>
+                    <span>Blokir IP (Timer)</span>
                 </span>
                 <span id="badgeBannedCount" class="px-1.5 py-0.5 text-[11px] font-mono font-semibold rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">0</span>
             </button>
@@ -192,9 +191,8 @@
         <!-- VIEW 1: BERANDA / OVERVIEW -->
         <main id="view-overview" class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-8">
 
-            <!-- HERO HEADLINE & GLOBAL SEARCH WITH NETWORK ACCENTS -->
+            <!-- HERO HEADLINE & GLOBAL SEARCH -->
             <div class="relative rounded-2xl border border-slate-800/90 bg-slate-900/60 backdrop-blur-md p-6 sm:p-8 overflow-visible">
-                <!-- Decorative Corner Network Nodes SVG -->
                 <svg class="pointer-events-none absolute top-0 right-0 w-64 h-40 text-emerald-500/15" viewBox="0 0 260 160" fill="none">
                     <circle cx="220" cy="30" r="3" fill="currentColor"/>
                     <circle cx="165" cy="58" r="2.5" fill="currentColor"/>
@@ -209,14 +207,14 @@
                 <div class="max-w-3xl mx-auto text-center space-y-4 relative z-10">
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-semibold text-emerald-400">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                        <span>Enterprise Edge Network &amp; Reverse Proxy</span>
+                        <span>Enterprise Edge Network &amp; Escalating Timed Ban</span>
                     </div>
 
                     <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                         Protecting today?
                     </h1>
                     <p class="text-xs text-slate-400 max-w-lg mx-auto">
-                        Pantau simpul domain terproteksi, filter serangan SQLi/XSS, dan kelola pemblokiran IP secara waktu nyata.
+                        Pantau simpul domain terproteksi, filter serangan SQLi/XSS/DDoS, dan kelola pemblokiran otomatis berbasis timer bertingkat.
                     </p>
 
                     <div class="relative text-left pt-1">
@@ -233,13 +231,12 @@
                             </div>
                         </div>
 
-                        <!-- INSTANT SEARCH DROPDOWN -->
                         <div id="heroSearchResults" class="hidden absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-72 overflow-y-auto divide-y divide-slate-800"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- LIVE NETWORK TOPOLOGY FLOW CARD (AKSEN JARINGAN) -->
+            <!-- LIVE NETWORK TOPOLOGY FLOW CARD -->
             <div class="rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-2">
@@ -250,7 +247,6 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-5 items-center gap-3">
-                    <!-- NODE 1: VISITOR TRAFFIC -->
                     <div class="rounded-xl border border-slate-800 bg-slate-950/90 p-3.5 flex items-center gap-3">
                         <div class="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -263,7 +259,6 @@
                         </div>
                     </div>
 
-                    <!-- CONNECTOR 1 -->
                     <div class="hidden md:flex items-center justify-center">
                         <svg class="w-full h-6" viewBox="0 0 100 24" fill="none">
                             <line x1="0" y1="12" x2="92" y2="12" stroke="#1e293b" stroke-width="2"/>
@@ -272,7 +267,6 @@
                         </svg>
                     </div>
 
-                    <!-- NODE 2: WARDENWAF SHIELD -->
                     <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 flex items-center gap-3 shadow-md shadow-emerald-950/40">
                         <div class="w-9 h-9 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0">
                             <svg class="w-5 h-5" viewBox="0 0 24 26" fill="none">
@@ -282,11 +276,10 @@
                         </div>
                         <div class="min-w-0">
                             <div class="text-[11px] font-mono text-emerald-400">WAF ENGINE</div>
-                            <div class="text-xs font-extrabold text-white truncate">SQLi &bull; XSS &bull; Rate Limit</div>
+                            <div class="text-xs font-extrabold text-white truncate">SQLi &bull; XSS &bull; Timed Ban</div>
                         </div>
                     </div>
 
-                    <!-- CONNECTOR 2 -->
                     <div class="hidden md:flex items-center justify-center">
                         <svg class="w-full h-6" viewBox="0 0 100 24" fill="none">
                             <line x1="0" y1="12" x2="92" y2="12" stroke="#1e293b" stroke-width="2"/>
@@ -295,7 +288,6 @@
                         </svg>
                     </div>
 
-                    <!-- NODE 3: ORIGIN SERVERS -->
                     <div class="rounded-xl border border-slate-800 bg-slate-950/90 p-3.5 flex items-center gap-3">
                         <div class="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -335,7 +327,7 @@
                     <div id="overviewDomainsList" class="divide-y divide-slate-800/80 border-t border-slate-800/80"></div>
                 </section>
 
-                <!-- COLUMN 2: BLOCKED IPS -->
+                <!-- COLUMN 2: BLOCKED IPS (TIMER) -->
                 <section id="overviewBannedCol" class="rounded-2xl border border-slate-800 bg-slate-900/75 backdrop-blur-md p-5 space-y-3">
                     <div class="flex items-center justify-between">
                         <button onclick="switchView('banned')" class="inline-flex items-center gap-1.5 text-sm font-bold text-white hover:text-emerald-400 transition">
@@ -397,7 +389,6 @@
                 </div>
             </div>
 
-            <!-- FILTER BAR -->
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2 flex-1">
                     <input type="text" id="searchDomainInput" oninput="renderDomainsTable()" placeholder="Cari domain, origin, atau pemilik..."
@@ -415,7 +406,6 @@
                 </button>
             </div>
 
-            <!-- DOMAINS TABLE -->
             <div class="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/80 backdrop-blur-md">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
@@ -440,15 +430,17 @@
             </div>
         </section>
 
-        <!-- VIEW 3: BANNED IPS (ADMIN ONLY) -->
+        <!-- VIEW 3: BANNED IPS WITH COUNTDOWN TIMER (ADMIN ONLY) -->
         <section id="view-banned" class="hidden flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-8 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-xl font-extrabold text-white">Blokir IP Permanen</h1>
-                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">Admin</span>
+                        <h1 class="text-xl font-extrabold text-white">Blokir IP Berbasis Timer</h1>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">Auto-Escalate</span>
                     </div>
-                    <p class="text-xs text-slate-400 mt-0.5">Daftar alamat IP yang dikunci permanen oleh sistem WAF maupun pemblokiran manual admin.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Pelanggaran ke-1 diblokir <span class="text-slate-200 font-semibold">5 menit</span>, ke-2 <span class="text-slate-200 font-semibold">30 menit</span>, ke-3 <span class="text-slate-200 font-semibold">2 jam</span>, ke-4+ <span class="text-slate-200 font-semibold">24 jam</span>. Otomatis terbuka saat timer habis.
+                    </p>
                 </div>
                 <button onclick="openManualBanModal()"
                     class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-sm">
@@ -472,14 +464,15 @@
                             <tr class="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                                 <th class="py-3.5 px-4">Alamat IP</th>
                                 <th class="py-3.5 px-4">Domain Target</th>
-                                <th class="py-3.5 px-4">Alasan Pemblokiran</th>
-                                <th class="py-3.5 px-4">Waktu Diblokir</th>
+                                <th class="py-3.5 px-4">Alasan &amp; Tingkat</th>
+                                <th class="py-3.5 px-4">Sisa Timer</th>
+                                <th class="py-3.5 px-4">Otomatis Dibuka</th>
                                 <th class="py-3.5 px-4 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="bannedIpsTableBody" class="divide-y divide-slate-800/80">
                             <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-500 text-xs">Memuat daftar IP terblokir...</td>
+                                <td colspan="6" class="py-8 text-center text-slate-500 text-xs">Memuat daftar IP terblokir...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -682,11 +675,11 @@
         </div>
     </div>
 
-    <!-- MODAL: BLOKIR IP MANUAL (ADMIN) -->
+    <!-- MODAL: BLOKIR IP MANUAL DENGAN TIMER (ADMIN) -->
     <div id="manualBanModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
-                <h3 class="text-sm font-bold text-white">Blokir Alamat IP Secara Permanen</h3>
+                <h3 class="text-sm font-bold text-white">Blokir Alamat IP</h3>
                 <button onclick="closeManualBanModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
             </div>
             <form onsubmit="submitManualBan(event)" class="p-6 space-y-4">
@@ -694,6 +687,17 @@
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alamat IP Target</label>
                     <input type="text" id="banIpInput" required placeholder="Contoh: 103.45.67.89"
                         class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Durasi Timer Pemblokiran</label>
+                    <select id="banDurationInput"
+                        class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-rose-500">
+                        <option value="5">5 Menit</option>
+                        <option value="30" selected>30 Menit</option>
+                        <option value="120">2 Jam</option>
+                        <option value="1440">24 Jam</option>
+                        <option value="0">Permanen (Tanpa Timer)</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Domain Terkait</label>
@@ -712,7 +716,7 @@
                     </button>
                     <button type="submit"
                         class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition">
-                        Kunci IP Permanen
+                        Terapkan Blokir
                     </button>
                 </div>
             </form>
@@ -758,6 +762,16 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        function formatCountdown(seconds) {
+            if (seconds === null || seconds === undefined) return "Permanen";
+            const s = Math.max(0, Math.floor(seconds));
+            const hrs = Math.floor(s / 3600);
+            const mins = Math.floor((s % 3600) / 60);
+            const secs = s % 60;
+            const pad = (n) => String(n).padStart(2, "0");
+            return hrs > 0 ? `${pad(hrs)}:${pad(mins)}:${pad(secs)}` : `${pad(mins)}:${pad(secs)}`;
         }
 
         function handleUnauthorized(res) {
@@ -838,7 +852,7 @@
                 overview: "Beranda WAF",
                 domains: "Domains",
                 logs: "Observability & Logs",
-                banned: "Blokir IP Permanen",
+                banned: "Blokir IP (Timer)",
                 users: "Manajemen User"
             };
 
@@ -903,7 +917,7 @@
                     results.push({
                         category: "Blocked IP",
                         title: b.ip_address,
-                        subtitle: b.reason,
+                        subtitle: `${b.reason} (${formatCountdown(b.remaining_seconds)})`,
                         action: () => {
                             document.getElementById("searchBannedInput").value = b.ip_address;
                             renderBannedTable();
@@ -1024,19 +1038,21 @@
                 `).join("");
             }
 
-            // Overview Banned IPs List
+            // Overview Banned IPs List (with live countdown)
             const banContainer = document.getElementById("overviewBannedList");
             if (bannedIpsCache.length === 0) {
-                banContainer.innerHTML = '<div class="py-4 text-xs text-slate-500">Tidak ada IP yang diblokir saat ini.</div>';
+                banContainer.innerHTML = '<div class="py-4 text-xs text-slate-500">Tidak ada IP yang sedang diblokir.</div>';
             } else {
                 banContainer.innerHTML = bannedIpsCache.slice(0, 5).map(b => `
                     <button onclick="switchView('banned')" type="button"
                         class="w-full py-3 px-1 flex items-center justify-between text-left hover:bg-slate-800/40 rounded-lg transition group">
                         <div class="min-w-0">
                             <div class="text-xs font-mono font-semibold text-rose-400 group-hover:text-rose-300 truncate">${escapeHtml(b.ip_address)}</div>
-                            <div class="text-[11px] text-slate-400 truncate">${escapeHtml(b.reason)}</div>
+                            <div class="text-[11px] text-slate-400 truncate">${escapeHtml(b.reason)} (Ke-${Number(b.ban_count || 1)})</div>
                         </div>
-                        <span class="text-slate-500 group-hover:text-rose-400 text-xs ml-2">&rsaquo;</span>
+                        <span class="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-[11px] font-mono text-rose-300 shrink-0 ml-2">
+                            ${escapeHtml(formatCountdown(b.remaining_seconds))}
+                        </span>
                     </button>
                 `).join("");
             }
@@ -1341,7 +1357,7 @@
             );
         }
 
-        // --- BANNED IPS MANAGEMENT (ADMIN) ---
+        // --- BANNED IPS WITH COUNTDOWN TIMER (ADMIN) ---
         async function loadBannedIps(notify = false) {
             if (CURRENT_ROLE !== "admin") return;
 
@@ -1352,7 +1368,7 @@
                 renderBannedTable();
                 renderLogsTable();
                 renderOverviewLists();
-                if (notify) showToast("Daftar IP terblokir diperbarui", "info");
+                if (notify) showToast("Daftar blokir timer diperbarui", "info");
             } catch (err) {
                 console.error(err);
             }
@@ -1369,28 +1385,41 @@
             );
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-slate-500 text-xs">Tidak ada IP yang sedang diblokir permanen.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="py-10 text-center text-slate-500 text-xs">Tidak ada IP yang sedang dalam masa blokir timer.</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = filtered.map(item => `
-                <tr class="hover:bg-slate-800/40 transition">
-                    <td class="py-3.5 px-4 font-mono font-bold text-rose-400">${escapeHtml(item.ip_address)}</td>
-                    <td class="py-3.5 px-4 text-slate-200 font-medium">${escapeHtml(item.domain)}</td>
-                    <td class="py-3.5 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">${escapeHtml(item.reason)}</span></td>
-                    <td class="py-3.5 px-4 text-slate-400 text-xs font-mono">${escapeHtml(item.banned_at)}</td>
-                    <td class="py-3.5 px-4 text-right">
-                        <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}')"
-                            class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg text-xs font-bold transition">
-                            Unblokir
-                        </button>
-                    </td>
-                </tr>
-            `).join("");
+            tbody.innerHTML = filtered.map(item => {
+                const countBadge = `<span class="ml-1.5 px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[11px]">Ke-${Number(item.ban_count || 1)}</span>`;
+                const timerText = formatCountdown(item.remaining_seconds);
+                const timerBadge = item.remaining_seconds === null
+                    ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">Permanen</span>'
+                    : `<span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">${escapeHtml(timerText)}</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-3.5 px-4 font-mono font-bold text-rose-400">${escapeHtml(item.ip_address)}</td>
+                        <td class="py-3.5 px-4 text-slate-200 font-medium">${escapeHtml(item.domain)}</td>
+                        <td class="py-3.5 px-4">
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">${escapeHtml(item.reason)}</span>
+                            ${countBadge}
+                        </td>
+                        <td class="py-3.5 px-4">${timerBadge}</td>
+                        <td class="py-3.5 px-4 text-slate-400 text-xs font-mono">${escapeHtml(item.unblock_at || "-")}</td>
+                        <td class="py-3.5 px-4 text-right">
+                            <button onclick="confirmUnblockIp('${escapeHtml(item.ip_address)}')"
+                                class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg text-xs font-bold transition">
+                                Unblokir Sekarang
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
         }
 
         function openManualBanModal(prefillIp = "", prefillDomain = "Semua Domain (Manual)") {
             document.getElementById("banIpInput").value = prefillIp;
+            document.getElementById("banDurationInput").value = "30";
             document.getElementById("banDomainInput").value = prefillDomain;
             document.getElementById("banReasonInput").value = "Diblokir Manual oleh Admin";
             document.getElementById("manualBanModal").classList.remove("hidden");
@@ -1403,19 +1432,21 @@
         async function submitManualBan(e) {
             e.preventDefault();
             const ip_address = document.getElementById("banIpInput").value.trim();
+            const duration_minutes = parseInt(document.getElementById("banDurationInput").value, 10);
             const domain = document.getElementById("banDomainInput").value.trim();
             const reason = document.getElementById("banReasonInput").value.trim();
 
             const res = await fetch("/admin/api/banned-ips", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ip_address, domain, reason })
+                body: JSON.stringify({ ip_address, duration_minutes, domain, reason })
             });
 
             if (handleUnauthorized(res)) return;
             if (res.ok) {
+                const data = await res.json().catch(() => ({}));
                 closeManualBanModal();
-                showToast(`IP ${ip_address} berhasil diblokir permanen`);
+                showToast(data.message || `IP ${ip_address} berhasil diblokir`);
                 await loadBannedIps(false);
             } else {
                 showToast("Gagal memblokir IP", "error");
@@ -1424,8 +1455,8 @@
 
         function confirmUnblockIp(ip) {
             openConfirmModal(
-                "Buka Blokir IP Permanen",
-                `Izinkan kembali alamat IP ${ip} untuk mengakses situs yang dilindungi WardenWAF?`,
+                "Buka Blokir IP & Reset Riwayat",
+                `Izinkan kembali alamat IP ${ip} sekarang? Riwayat jumlah pelanggaran untuk IP ini juga akan direset.`,
                 "Ya, Unblokir IP",
                 async () => {
                     const res = await fetch(`/admin/api/banned-ips/${encodeURIComponent(ip)}`, {
@@ -1484,7 +1515,7 @@
                             <div class="inline-flex items-center justify-end gap-1.5">
                                 ${!isAlreadyBanned
                                     ? `<button onclick="openManualBanModal('${escapeHtml(l.ip_address)}', '${escapeHtml(l.domain)}')" class="bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">Blokir IP</button>`
-                                    : `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[11px] font-medium">Sudah Diblokir</span>`
+                                    : `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[11px] font-medium">Sedang Diblokir</span>`
                                 }
                                 <button onclick="deleteSingleLog(${Number(l.id)})" class="bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
                                     Hapus
@@ -1523,7 +1554,7 @@
         function confirmClearAllLogs() {
             openConfirmModal(
                 "Bersihkan Seluruh Log Serangan",
-                "Semua riwayat log serangan di database akan dihapus secara permanen. Daftar IP yang sudah diblokir tidak akan terhapus.",
+                "Semua riwayat log serangan di database akan dihapus secara permanen. Daftar IP yang sedang diblokir tidak akan terhapus.",
                 "Ya, Bersihkan Semua",
                 async () => {
                     const res = await fetch("/admin/api/logs", {
@@ -1539,6 +1570,26 @@
                     }
                 }
             );
+        }
+
+        // LIVE COUNTDOWN TICKER EVERY 1 SECOND
+        function tickBanCountdowns() {
+            if (CURRENT_ROLE !== "admin" || bannedIpsCache.length === 0) return;
+            let anyExpired = false;
+            bannedIpsCache.forEach(item => {
+                if (typeof item.remaining_seconds === "number") {
+                    item.remaining_seconds -= 1;
+                    if (item.remaining_seconds <= 0) {
+                        anyExpired = true;
+                    }
+                }
+            });
+            if (anyExpired) {
+                loadBannedIps(false);
+            } else {
+                renderBannedTable();
+                renderOverviewLists();
+            }
         }
 
         // KEYBOARD SHORTCUT CTRL+K & CLICK OUTSIDE SEARCH
@@ -1559,6 +1610,7 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             initDashboard();
+            setInterval(tickBanCountdowns, 1000);
             setInterval(() => syncAllData(false), 8000);
         });
     </script>
