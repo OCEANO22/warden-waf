@@ -96,7 +96,6 @@ def init_db():
             banned_until DOUBLE PRECISION,
             ban_count INTEGER NOT NULL DEFAULT 1
         )''')
-        # Migrasi aman jika tabel banned_ips lama sudah ada di PostgreSQL
         cursor.execute("ALTER TABLE banned_ips ADD COLUMN IF NOT EXISTS banned_until DOUBLE PRECISION")
         cursor.execute("ALTER TABLE banned_ips ADD COLUMN IF NOT EXISTS ban_count INTEGER NOT NULL DEFAULT 1")
     else:
@@ -130,7 +129,6 @@ def init_db():
             banned_until REAL,
             ban_count INTEGER NOT NULL DEFAULT 1
         )''')
-        # Migrasi aman jika tabel banned_ips lama sudah ada di SQLite
         for alter_sql in [
             "ALTER TABLE banned_ips ADD COLUMN banned_until REAL",
             "ALTER TABLE banned_ips ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 1"
@@ -162,7 +160,7 @@ class ManualBanData(BaseModel):
     ip_address: str
     domain: Optional[str] = "Semua Domain (Manual)"
     reason: Optional[str] = "Diblokir Manual oleh Admin"
-    duration_minutes: Optional[int] = 30  # None atau <= 0 berarti permanen
+    duration_minutes: Optional[int] = 30
 
 class AuthData(BaseModel):
     username: str
@@ -177,7 +175,7 @@ class ChallengeVerifyData(BaseModel):
 
 # --- FUNGSI SESI LOGIN PANEL ADMIN (SERVER-SIDE HTTPONLY COOKIE) ---
 def create_admin_session_token(username: str, role: str) -> str:
-    exp_ts = str(int(time.time()) + 1800)  # Sesi aktif 30 menit
+    exp_ts = str(int(time.time()) + 1800)
     payload = f"{username}:{role}:{exp_ts}"
     sig = hmac.new(
         WAF_SECRET.encode("utf-8"),
@@ -214,11 +212,6 @@ def require_session(request: Request) -> dict:
 
 # --- FUNGSI HELPER PEMBLOKIRAN TIMER & ESKALASI BERTINGKAT ---
 def is_ip_banned(ip: str) -> Optional[dict]:
-    """
-    Memeriksa apakah IP sedang dalam masa blokir.
-    Jika timer sudah habis, IP otomatis diizinkan masuk kembali, namun catatan
-    ban_count tetap disimpan agar pelanggaran berikutnya mendapat durasi lebih lama.
-    """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(q("SELECT reason, banned_until, ban_count FROM banned_ips WHERE ip_address=?"), (ip,))
@@ -249,17 +242,10 @@ def is_ip_banned(ip: str) -> Optional[dict]:
             "unblock_at": unblock_str
         }
 
-    # Timer sudah habis -> otomatis terbuka, bersihkan log rate-limit lama
     REQUEST_LOGS.pop(ip, None)
     return None
 
 def ban_ip_with_escalation(ip: str, domain: str, reason: str, custom_duration_seconds: Optional[int] = None) -> dict:
-    """
-    Memblokir IP dengan timer bertingkat berdasarkan riwayat pelanggaran sebelumnya.
-    Jika custom_duration_seconds diberikan:
-      - > 0 : pakai durasi khusus (misal dari input manual admin)
-      - <= 0: blokir permanen (banned_until = NULL)
-    """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(q("SELECT ban_count FROM banned_ips WHERE ip_address=?"), (ip,))
@@ -738,7 +724,6 @@ def unblock_ip(target_ip: str, request: Request):
         raise HTTPException(status_code=403, detail="Hanya admin yang dapat membuka blokir IP")
     conn = get_db()
     cursor = conn.cursor()
-    # Unblokir manual oleh admin menghapus catatan pelanggaran sepenuhnya
     cursor.execute(q("DELETE FROM banned_ips WHERE ip_address=?"), (target_ip,))
     conn.commit()
     cursor.close()
@@ -806,7 +791,7 @@ def resolve_proxy_target(request: Request, path: str):
         if cookie_site:
             return cookie_site.strip().lower(), clean_path, None
 
-    # 3. Default: gunakan header Host (mengabaikan cookie jika pengunjung membuka '/' secara langsung)
+    # 3. Default: gunakan header Host
     return host_header, clean_path, None
 
 def inject_spa_subpath_handler(html_bytes: bytes, site_name: str) -> bytes:
@@ -824,6 +809,12 @@ def inject_spa_subpath_handler(html_bytes: bytes, site_name: str) -> bytes:
     }}
     return url;
   }}
+  function ensurePrefixInBar() {{
+    var cur = window.location.pathname;
+    if (cur !== prefix && cur.indexOf(prefix + "/") !== 0) {{
+      origReplace.call(history, history.state, "", prefix + (cur === "/" ? "" : cur) + window.location.search + window.location.hash);
+    }}
+  }}
   history.pushState = function(state, title, url) {{
     return origPush.call(history, state, title, withPrefix(url));
   }};
@@ -833,13 +824,19 @@ def inject_spa_subpath_handler(html_bytes: bytes, site_name: str) -> bytes:
   if (window.location.pathname === prefix || window.location.pathname.indexOf(prefix + "/") === 0) {{
     var innerPath = window.location.pathname.slice(prefix.length) || "/";
     origReplace.call(history, history.state, "", innerPath + window.location.search + window.location.hash);
-    window.addEventListener("load", function() {{
-      var currentInner = window.location.pathname;
-      if (currentInner.indexOf(prefix) !== 0) {{
-        origReplace.call(history, history.state, "", prefix + (currentInner === "/" ? "" : currentInner) + window.location.search + window.location.hash);
-      }}
+    document.addEventListener("DOMContentLoaded", function() {{
+      setTimeout(ensurePrefixInBar, 0);
     }});
+    window.addEventListener("load", ensurePrefixInBar);
   }}
+  document.addEventListener("click", function(e) {{
+    var anchor = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+    if (!anchor) return;
+    var rawHref = anchor.getAttribute("href");
+    if (rawHref && rawHref.charAt(0) === "/" && rawHref.charAt(1) !== "/" && rawHref.indexOf(prefix) !== 0) {{
+      anchor.setAttribute("href", withPrefix(rawHref));
+    }}
+  }}, true);
 }})();
 </script>"""
     if re.search(r"<head[^>]*>", html_text, re.IGNORECASE):
@@ -854,6 +851,7 @@ async def reverse_proxy(request: Request, path: str):
         return JSONResponse(status_code=404, content={"error": "Not Found"})
 
     client_ip = get_client_ip(request)
+    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
     target_domain, forward_path, new_site_cookie = resolve_proxy_target(request, path)
 
     conn = get_db()
@@ -864,10 +862,24 @@ async def reverse_proxy(request: Request, path: str):
     conn.close()
 
     if not row:
+        clean_path = "/" + path.lstrip("/")
+        cookie_site = (request.cookies.get("warden_site") or "").strip().lower()
+        # Jika reload mengarah ke '/' namun sesi /p/<nama_web> masih ada, arahkan kembali otomatis
+        if clean_path == "/" and cookie_site and not new_site_cookie:
+            conn_chk = get_db()
+            cur_chk = conn_chk.cursor()
+            cur_chk.execute(q("SELECT 1 FROM clients WHERE domain=?"), (cookie_site,))
+            exists = cur_chk.fetchone()
+            cur_chk.close()
+            conn_chk.close()
+            if exists:
+                return RedirectResponse(url=f"/p/{cookie_site}", status_code=302)
+
         resp_404 = JSONResponse(status_code=404, content={"error": "Domain tidak terdaftar di WardenWAF."})
-        if request.cookies.get("warden_site") and not new_site_cookie:
+        if cookie_site and not new_site_cookie:
             resp_404.delete_cookie("warden_site", path="/")
         return resp_404
+
     client_config = {"origin": row[0], "waf_enabled": bool(row[1]), "rate_limit": row[2], "status": row[3]}
 
     if client_config["status"] == "pending":
@@ -989,8 +1001,9 @@ async def reverse_proxy(request: Request, path: str):
 
             resp_body = await proxy_resp.aread()
             content_type = proxy_resp.headers.get("content-type", "").lower()
-            if new_site_cookie and "text/html" in content_type:
-                resp_body = inject_spa_subpath_handler(resp_body, new_site_cookie)
+            is_subpath_mode = bool(new_site_cookie) or (target_domain != host_header)
+            if is_subpath_mode and "text/html" in content_type:
+                resp_body = inject_spa_subpath_handler(resp_body, target_domain)
 
             final_resp = Response(
                 content=resp_body,
